@@ -22,6 +22,10 @@ func main() {
 	// Listing routes
     lsvc := listing.NewInMemoryService()
     listing.RegisterRoutes(r, lsvc)
-	
+
+	// Order
+    osvc := order.NewInMemoryService()
+    order.RegisterRoutes(r, osvc)
+
   r.Run(":8080")  // http://localhost:8080
 }
