@@ -4,6 +4,8 @@ import (
   "github.com/gin-gonic/gin"
   "github.com/albus-droid/Capstone-Project-Backend/internal/user"
   "github.com/albus-droid/Capstone-Project-Backend/internal/seller"
+  "github.com/albus-droid/Capstone-Project-Backend/internal/listing"
+
 
 )
 
@@ -16,5 +18,10 @@ func main() {
     // seller routes
     ssvc := seller.NewInMemoryService()
     seller.RegisterRoutes(r, ssvc)
+
+	// Listing routes
+    lsvc := listing.NewInMemoryService()
+    listing.RegisterRoutes(r, lsvc)
+	
   r.Run(":8080")  // http://localhost:8080
 }
