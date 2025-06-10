@@ -6,7 +6,7 @@ import (
 )
 
 // Helper: compare two slices of Point2D (order doesn’t matter)
-func sameSet(a, b []Point2D) bool {
+func sameSet(a, b []point2D) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -32,7 +32,7 @@ func sameSet(a, b []Point2D) bool {
 }
 
 func TestRangeSearch(t *testing.T) {
-	points := []Point2D{
+	points := []point2D{
 		{X: -79.3832, Y: 43.6532}, // P0: Toronto
 		{X: -80.0000, Y: 43.5000}, // P1: ~33 km WSW
 		{X: -79.9000, Y: 43.7000}, // P2: ~59 km WNW
@@ -43,15 +43,15 @@ func TestRangeSearch(t *testing.T) {
 	tree := New(points)
 
 	tests := []struct {
-		center   Point2D
+		center   point2D
 		radiusKm float64
-		expected []Point2D
+		expected []point2D
 	}{
 		{
 			// Searching around Toronto with radius 50 km should catch P0, P1, P4
-			center:   Point2D{X: -79.3832, Y: 43.6532},
+			center:   point2D{X: -79.3832, Y: 43.6532},
 			radiusKm: 50.0,
-			expected: []Point2D{
+			expected: []point2D{
 				{X: -79.3832, Y: 43.6532}, // P0 itself
 				{X: -80.0000, Y: 43.5000}, // P1
 				{X: -79.8000, Y: 43.6000}, // P4
@@ -59,15 +59,15 @@ func TestRangeSearch(t *testing.T) {
 		},
 		{
 			// Searching around a point far away with radius 10 km should catch nobody
-			center:   Point2D{X: -100.0, Y: 50.0},
+			center:   point2D{X: -100.0, Y: 50.0},
 			radiusKm: 10.0,
-			expected: []Point2D{},
+			expected: []point2D{},
 		},
 		{
 			// Radius zero at Toronto should return exactly that point
-			center:   Point2D{X: -79.3832, Y: 43.6532},
+			center:   point2D{X: -79.3832, Y: 43.6532},
 			radiusKm: 0.0,
-			expected: []Point2D{
+			expected: []point2D{
 				{X: -79.3832, Y: 43.6532},
 			},
 		},
