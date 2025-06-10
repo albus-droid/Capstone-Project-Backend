@@ -1,2 +1,2 @@
 # Backend
-Backend for the project
+Backend for the my Capston Project. Planning to implement it as a micro service. 
