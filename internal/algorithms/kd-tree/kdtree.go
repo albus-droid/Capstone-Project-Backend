@@ -1,3 +1,4 @@
+package kdtree
 import (
 	"fmt"
 	"math"
@@ -10,7 +11,7 @@ type point2D struct{
 }
 
 // finding distance using haversines formula
-func (p Point2D) Distance(q Point2D) float64 {
+func (p point2D) Distance(q point2D) float64 {
 	const R = 6371.0 // Earth radius in kilometers
 
 	lat1 := p.Y * math.Pi / 180
@@ -38,7 +39,7 @@ type node struct {
 }
 
 // kd-tree with just root node
-type KDtree struct {
+type KDTree struct {
 	root *node
 }
 
