@@ -1,5 +1,5 @@
 # Build Stage
-FROM golang:1.20-alpine AS builder
+FROM golang:1.24.4-alpine AS builder
 WORKDIR /app
 # Cache dependencies
 COPY go.mod go.sum ./
@@ -17,7 +17,5 @@ COPY --from=builder /app/server ./server
 # Expose port
 EXPOSE 8080
 # Environment variables (can override in CI/production)
-ENV DATABASE_URL="postgres://user:pass@db:5432/homecooked?sslmode=disable"
-ENV JWT_SECRET="replace-with-secure-secret"
 # Entrypoint
 ENTRYPOINT ["./server"]
