@@ -10,6 +10,8 @@ import (
 
 func main() {
 	r := gin.Default()
+	bus := events.NewBus()
+
 	// user routes
 	usvc := user.NewInMemoryService()
 	user.RegisterRoutes(r, usvc)
@@ -25,6 +27,17 @@ func main() {
 	// Order
 	osvc := order.NewInMemoryService()
 	order.RegisterRoutes(r, osvc)
+
+    // subscribe to OrderPlacedEvent
+    bus.Subscribe("OrderPlacedEvent", func(e events.Event) {
+        evt := e.(events.OrderPlacedEvent)
+        seller, found := sellerSvc.GetByID(evt.SellerID)
+        if !found {
+            log.Printf("❌ Seller %s not found for order %s", evt.SellerID, evt.OrderID)
+            return
+        }
+        log.Printf("📦 Notify seller %s (%s): new order %s from %s", seller.Name, seller.Email, evt.OrderID, evt.UserEmail)
+    })
 
 	r.Run(":8080") // http://localhost:8080
 }
