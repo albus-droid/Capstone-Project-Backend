@@ -15,15 +15,13 @@ type Bus struct {
 }
 
 func NewBus() *Bus {
-    return &Bus{
-        subs: make(map[string][]HandlerFunc),
-    }
+    return &Bus{subs: make(map[string][]HandlerFunc)}
 }
 
-func (b *Bus) Subscribe(eventName string, h HandlerFunc) {
+func (b *Bus) Subscribe(name string, h HandlerFunc) {
     b.mu.Lock()
-    defer b.mu.Unlock()
-    b.subs[eventName] = append(b.subs[eventName], h)
+    b.subs[name] = append(b.subs[name], h)
+    b.mu.Unlock()
 }
 
 func (b *Bus) Publish(event Event) {
@@ -31,7 +29,8 @@ func (b *Bus) Publish(event Event) {
     b.mu.RLock()
     handlers := b.subs[name]
     b.mu.RUnlock()
+
     for _, h := range handlers {
-        go h(event) // async handler
+        go h(event) // async call
     }
 }
