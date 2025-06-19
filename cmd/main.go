@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 
+	"github.com/albus-droid/Capstone-Project-Backend/internal/event"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/listing"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/order"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/seller"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/user"
-	"github.com/albus-droid/Capstone-Project-Backend/internal/event"
 	"github.com/gin-gonic/gin"
 )
 
@@ -37,10 +37,14 @@ func startNotificationListener() {
 	go func() {
 		for e := range event.Bus {
 			switch e.Type {
+
+			case "OrderPlaced":
+				order := e.Data.(order.Order)
+				fmt.Printf("📦 Notify seller %s of new order %s\n", order.SellerID, order.ID)
+
 			case "OrderAccepted":
 				order := e.Data.(order.Order)
 				fmt.Printf("📬 Notify user %s that order %s was accepted\n", order.UserID, order.ID)
-				// call sendEmail(), push(), or anything else here
 			}
 		}
 	}()
