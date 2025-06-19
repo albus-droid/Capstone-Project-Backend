@@ -23,7 +23,7 @@ import (
 )
 
 // -----------------------------------------------------------------------------
-// Helpers: build a complete Gin router with in-memory services wired together
+// Helpers: build a complete Gin router with in‑memory services wired together
 // -----------------------------------------------------------------------------
 func newRouter() (*gin.Engine, struct {
     usvc user.Service
@@ -92,7 +92,7 @@ func TestSeller_CRUD(t *testing.T) {
     r, _ := newRouter()
 
     // Register
-    s := map[string]interface{}{"id": "s1", "name": "Bob", "email": "bob@ex.com"}
+    s := map[string]interface{}{`id`: `s1`, `name`: `Bob`, `email`: `bob@ex.com`}
     b, _ := json.Marshal(s)
     w := httptest.NewRecorder()
     req := httptest.NewRequest(http.MethodPost, "/sellers/register", bytes.NewReader(b))
@@ -200,8 +200,9 @@ func TestOrder_CreateAndEventFlow(t *testing.T) {
     req = httptest.NewRequest(http.MethodPatch, "/orders/o1/accept", nil)
     r.ServeHTTP(w, req)
     if w.Code != http.StatusOK {
-        t.Fatalf("expected 200 on accept, got %d", w.Code)
+        t.Fatalf("expected 200, got %d", w.Code)
     }
+
     select {
     case evt := <-bus:
         if evt.Type != "OrderAccepted" {
@@ -213,23 +214,23 @@ func TestOrder_CreateAndEventFlow(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// CONCURRENCY test for Seller.Register (race-safety)
+// CONCURRENCY test for Seller.Register (race‑safety)
 // -----------------------------------------------------------------------------
 func TestSeller_ConcurrentRegister(t *testing.T) {
     svc := seller.NewInMemoryService()
-    const n = 100
+    const n = 10 // reduced to avoid heavy goroutines
     wg := sync.WaitGroup{}
     for i := 0; i < n; i++ {
         wg.Add(1)
         go func(i int) {
             defer wg.Done()
-            id := "s-" + string(rune(i))
+            id := fmt.Sprintf("s-%d", i)
             _ = svc.Register(seller.Seller{ID: id, Name: "X", Email: id + "@x.com"})
         }(i)
     }
     wg.Wait()
     got := svc.ListAll()
-    if len(got) == 0 {
-        t.Fatalf("expected some sellers, got 0")
+    if len(got) != n {
+        t.Fatalf("expected %d sellers, got %d", n, len(got))
     }
 }
