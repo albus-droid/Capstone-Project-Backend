@@ -13,6 +13,8 @@ import (
 
 func main() {
 	r := gin.Default()
+	bus := events.NewBus()
+
 	// user routes
 	usvc := user.NewInMemoryService()
 	user.RegisterRoutes(r, usvc)
@@ -28,6 +30,7 @@ func main() {
 	// Order
 	osvc := order.NewInMemoryService()
 	order.RegisterRoutes(r, osvc)
+
 
 	startNotificationListener()
 	r.Run(":8080") // http://localhost:8080
