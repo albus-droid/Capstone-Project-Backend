@@ -45,4 +45,14 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
         list, _ := svc.ListByUser(userID)
         c.JSON(http.StatusOK, list)
     })
+
+    grp.PATCH("/:id/accept", func(c *gin.Context) {
+    id := c.Param("id")
+    if err := svc.Accept(id); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{"message": "order accepted"})
+})
+
 }

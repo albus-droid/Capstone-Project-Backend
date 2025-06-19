@@ -41,3 +41,29 @@ func (s *inMemoryService) ListByUser(userID string) ([]Order, error) {
     }
     return list, nil
 }
+
+func (s *inMemoryService) Accept(id string) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    order, ok := s.orders[id]
+    if !ok {
+        return errors.New("order not found")
+    }
+
+    if order.Status != "pending" {
+        return errors.New("order already processed")
+    }
+
+    order.Status = "accepted"
+    s.orders[id] = order
+
+    go func() {
+        EventBus <- Event{
+            Type: "OrderAccepted",
+            Data: order,
+        }
+    }()
+
+    return nil
+}
