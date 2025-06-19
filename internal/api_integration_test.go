@@ -40,7 +40,7 @@ func newRouter() (*gin.Engine, struct {
         osvc order.Service
     }{
         usvc: user.NewInMemoryService(),
-        ssvc: seller.NewInMemoryService(nil),
+        ssvc: seller.NewInMemoryService(),
         lsvc: listing.NewInMemoryService(),
         osvc: order.NewInMemoryService(),
     }
@@ -222,7 +222,7 @@ func TestOrder_CreateAndEventFlow(t *testing.T) {
 // CONCURRENCY test for Seller.Register (race‑safety)
 // -----------------------------------------------------------------------------
 func TestSeller_ConcurrentRegister(t *testing.T) {
-    svc := seller.NewInMemoryService(nil)
+    svc := seller.NewInMemoryService()
     const n = 100
     wg := sync.WaitGroup{}
     for i := 0; i < n; i++ {
