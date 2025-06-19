@@ -5,4 +5,5 @@ type Service interface {
     Create(o Order) error
     GetByID(id string) (*Order, error)
     ListByUser(userID string) ([]Order, error)
+    Accept(id string) error
 }

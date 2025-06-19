@@ -1,11 +1,16 @@
 package order
 
+import "github.com/albus-droid/Capstone-Project-Backend/internal/event"
+
 import (
     "errors"
     "time"
 )
 
+import "sync"
+
 type inMemoryService struct {
+    mu     sync.Mutex
     orders map[string]Order
 }
 
@@ -43,27 +48,21 @@ func (s *inMemoryService) ListByUser(userID string) ([]Order, error) {
 }
 
 func (s *inMemoryService) Accept(id string) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-    order, ok := s.orders[id]
-    if !ok {
-        return errors.New("order not found")
-    }
+	order, ok := s.orders[id]
+	if !ok {
+		return errors.New("order not found")
+	}
 
-    if order.Status != "pending" {
-        return errors.New("order already processed")
-    }
+	// no status change, but still trigger event
+	go func() {
+		event.Bus <- event.Event{
+			Type: "OrderAccepted",
+			Data: order,
+		}
+	}()
 
-    order.Status = "accepted"
-    s.orders[id] = order
-
-    go func() {
-        EventBus <- Event{
-            Type: "OrderAccepted",
-            Data: order,
-        }
-    }()
-
-    return nil
+	return nil
 }

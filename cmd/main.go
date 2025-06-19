@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/albus-droid/Capstone-Project-Backend/internal/listing"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/order"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/seller"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/user"
+	"github.com/albus-droid/Capstone-Project-Backend/internal/event"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,5 +29,19 @@ func main() {
 	osvc := order.NewInMemoryService()
 	order.RegisterRoutes(r, osvc)
 
+	startNotificationListener()
 	r.Run(":8080") // http://localhost:8080
+}
+
+func startNotificationListener() {
+	go func() {
+		for e := range event.Bus {
+			switch e.Type {
+			case "OrderAccepted":
+				order := e.Data.(order.Order)
+				fmt.Printf("📬 Notify user %s that order %s was accepted\n", order.UserID, order.ID)
+				// call sendEmail(), push(), or anything else here
+			}
+		}
+	}()
 }
