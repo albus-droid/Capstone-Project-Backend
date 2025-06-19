@@ -7,6 +7,9 @@ package internal_test
 import (
     "bytes"
     "encoding/json"
+    "fmt"
+    "bytes"
+    "encoding/json"
     "net/http"
     "net/http/httptest"
     "strings"
