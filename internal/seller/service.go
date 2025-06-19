@@ -1,11 +1,5 @@
 package seller
 
-type Seller struct {
-    ID    string
-    Name  string
-    Email string
-}
-
 type Service interface {
     GetByID(id string) (Seller, bool)
 }
