@@ -5,6 +5,6 @@ type Listing struct {
     SellerID    string  `json:"sellerId"`
     Title       string  `json:"title"`
     Description string  `json:"description"`
-    Price       float64 `json:"price"`
+    Price       int     `json:"price"`
     Available   bool    `json:"available"`
 }
