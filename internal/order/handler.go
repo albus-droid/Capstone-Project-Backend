@@ -12,8 +12,12 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 	grp := r.Group("/orders")
 	grp.Use(auth.Middleware())
 
+	// ─────────────────────────────────────────────────────────────
+	// POST /orders – create an order
+	// ─────────────────────────────────────────────────────────────
 	grp.POST("", func(c *gin.Context) {
 		var payload struct {
+			ID         string   `json:"id"`         // 👈 client-supplied ID
 			ListingIDs []string `json:"listingIds"`
 			SellerID   string   `json:"sellerId"`
 			Total      float64  `json:"total"`
@@ -24,7 +28,8 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 		}
 
 		email := c.GetString(string(auth.CtxEmailKey))
-		order := Order{
+		o := Order{
+			ID:         payload.ID,      // 👈 store it
 			UserEmail:  email,
 			SellerID:   payload.SellerID,
 			ListingIDs: payload.ListingIDs,
@@ -32,13 +37,16 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 			Status:     "pending",
 			CreatedAt:  time.Now().Unix(),
 		}
-		if err := svc.Create(order); err != nil {
+		if err := svc.Create(o); err != nil {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusCreated, gin.H{"message": "order created"})
+		c.JSON(http.StatusCreated, o) // return the order (or a message if you prefer)
 	})
 
+	// ─────────────────────────────────────────────────────────────
+	// GET /orders/:id – only owner can fetch
+	// ─────────────────────────────────────────────────────────────
 	grp.GET("/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		o, err := svc.GetByID(id)
@@ -53,12 +61,18 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 		c.JSON(http.StatusOK, o)
 	})
 
+	// ─────────────────────────────────────────────────────────────
+	// GET /orders – list my orders
+	// ─────────────────────────────────────────────────────────────
 	grp.GET("", func(c *gin.Context) {
 		email := c.GetString(string(auth.CtxEmailKey))
 		list, _ := svc.ListByUser(email)
 		c.JSON(http.StatusOK, list)
 	})
 
+	// ─────────────────────────────────────────────────────────────
+	// PATCH /orders/:id/accept
+	// ─────────────────────────────────────────────────────────────
 	grp.PATCH("/:id/accept", func(c *gin.Context) {
 		id := c.Param("id")
 		email := c.GetString(string(auth.CtxEmailKey))
@@ -69,6 +83,9 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 		c.JSON(http.StatusOK, gin.H{"message": "order accepted"})
 	})
 
+	// ─────────────────────────────────────────────────────────────
+	// PATCH /orders/:id/complete
+	// ─────────────────────────────────────────────────────────────
 	grp.PATCH("/:id/complete", func(c *gin.Context) {
 		id := c.Param("id")
 		email := c.GetString(string(auth.CtxEmailKey))
@@ -79,4 +96,3 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 		c.JSON(http.StatusOK, gin.H{"message": "order completed"})
 	})
 }
-// grp.DELETE("/:id", func(c *gin.Context) {
