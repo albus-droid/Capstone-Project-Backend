@@ -2,14 +2,11 @@ package auth
 
 import (
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 )
-
-var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
 type ctxKey string
 
@@ -26,14 +23,14 @@ func Middleware() gin.HandlerFunc {
 			if t.Method != jwt.SigningMethodHS256 {
 				return nil, jwt.ErrSignatureInvalid
 			}
-			return jwtSecret, nil
+			return Secret(), nil // ✅ Use shared secret
 		})
 		if err != nil || !tok.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			return
 		}
 		claims := tok.Claims.(jwt.MapClaims)
-		c.Set(string(CtxEmailKey), claims["sub"].(string)) // ✅ correct constant
+		c.Set(string(CtxEmailKey), claims["sub"].(string))
 		c.Next()
 	}
 }
