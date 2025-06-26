@@ -12,7 +12,9 @@ import (
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET")) // never hard-code
 
-const ctxEmailKey = "userEmail"
+type ctxKey string
+
+const CtxEmailKey ctxKey = "userEmail"
 
 // Middleware validates the JWT and stores the user’s e-mail in Gin’s context.
 func Middleware() gin.HandlerFunc {
