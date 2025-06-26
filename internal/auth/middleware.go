@@ -1,5 +1,4 @@
-// internal/auth/middleware.go
-package auth   // new package so every module can import it
+package auth
 
 import (
 	"net/http"
@@ -10,13 +9,12 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-var jwtSecret = []byte(os.Getenv("JWT_SECRET")) // never hard-code
+var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
 type ctxKey string
 
 const CtxEmailKey ctxKey = "userEmail"
 
-// Middleware validates the JWT and stores the user’s e-mail in Gin’s context.
 func Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
@@ -35,7 +33,7 @@ func Middleware() gin.HandlerFunc {
 			return
 		}
 		claims := tok.Claims.(jwt.MapClaims)
-		c.Set(ctxEmailKey, claims["sub"].(string)) // store e-mail
+		c.Set(string(CtxEmailKey), claims["sub"].(string)) // ✅ correct constant
 		c.Next()
 	}
 }
