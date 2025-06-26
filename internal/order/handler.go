@@ -2,6 +2,7 @@ package order
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/albus-droid/Capstone-Project-Backend/internal/auth"
 	"github.com/gin-gonic/gin"
@@ -10,12 +11,14 @@ import (
 // RegisterRoutes mounts order endpoints under /orders.
 func RegisterRoutes(r *gin.Engine, svc Service) {
 	grp := r.Group("/orders")
-	grp.Use(auth.Middleware()) // every route below is authenticated
+	grp.Use(auth.Middleware()) // all routes below are authenticated
 
-	// POST /orders – create order for the caller
+	// POST /orders – create an order for the caller
 	grp.POST("", func(c *gin.Context) {
 		var payload struct {
-			Items []string `json:"items"`
+			ListingIDs []string `json:"listingIds"`        // items in the cart
+			SellerID   string   `json:"sellerId"`          // seller fulfilling it
+			Total      float64  `json:"total"`             // client-calculated total
 		}
 		if err := c.ShouldBindJSON(&payload); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -24,8 +27,12 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 
 		email := c.GetString(string(auth.CtxEmailKey))
 		order := Order{
-			UserEmail: email,
-			Items:     payload.Items,
+			UserEmail:  email,               // owner
+			SellerID:   payload.SellerID,
+			ListingIDs: payload.ListingIDs,
+			Total:      payload.Total,
+			Status:     "pending",
+			CreatedAt:  time.Now().Unix(),
 		}
 
 		if err := svc.Create(order); err != nil {
@@ -69,4 +76,15 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "order accepted"})
 	})
+}
+// PATCH /orders/:id/complete – owner (or privileged role) completes
+func (svc Service) Complete(c *gin.Context) {
+	id := c.Param("id")
+	email := c.GetString(string(auth.CtxEmailKey))
+
+	if err := svc.Complete(id, email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "order completed"})
 }
