@@ -1,4 +1,5 @@
 // internal/order/service.go
+package order
 type Service interface {
     Create(o Order) error
     GetByID(id string) (*Order, error)
@@ -7,4 +8,3 @@ type Service interface {
     Accept(id, callerEmail string) error   // ← 2 args
     Complete(id, callerEmail string) error // ← 2 args
 }
-package order
