@@ -166,53 +166,117 @@ func TestListing_CRUD(t *testing.T) {
 // ORDER MODULE + EVENT FLOW
 // -----------------------------------------------------------------------------
 func TestOrder_CreateAndEventFlow(t *testing.T) {
-    // Create an isolated event bus per test
+    // Create isolated event bus
     bus := make(chan event.Event, 2)
     event.Bus = bus
 
     r, services := newRouter()
 
-    // Pre-seed a seller & listing
-    services.ssvc.Register(seller.Seller{ID: "s1", Name: "Bob", Email: "bob@ex.com"})
-    services.lsvc.Create(listing.Listing{ID: "l1", SellerID: "s1", Title: "Prod", Price: 10.0})
+    // Step 1: Register a seller
+    services.ssvc.Register(seller.Seller{
+        ID:    "s1",
+        Name:  "Bob",
+        Email: "bob@ex.com",
+    })
 
-    // Create order → expect OrderPlaced
-    ord := order.Order{ID: "o1", UserID: "u1", SellerID: "s1", ListingIDs: []string{"l1"}, Total: 10.0}
-    b, _ := json.Marshal(ord)
-    w := httptest.NewRecorder()
-    req := httptest.NewRequest(http.MethodPost, "/orders", bytes.NewReader(b))
-    req.Header.Set("Content-Type", "application/json")
-    r.ServeHTTP(w, req)
-    if w.Code != http.StatusCreated {
-        t.Fatalf("expected 201, got %d, body %s", w.Code, w.Body.String())
+    // Step 2: Create a listing
+    services.lsvc.Create(listing.Listing{
+        ID:        "l1",
+        SellerID:  "s1",
+        Title:     "Test Product",
+        Price:     10.0,
+        Available: true,
+    })
+
+    // Step 3: Register and login a user to get JWT
+    userReg := map[string]string{
+        "id":       "u1",
+        "name":     "Tom",
+        "email":    "tom@ex.com",
+        "password": "pw",
     }
-
-    select {
-    case evt := <-bus:
-        if evt.Type != "OrderPlaced" {
-            t.Fatalf("expected OrderPlaced, got %s", evt.Type)
+    {
+        b, _ := json.Marshal(userReg)
+        w := httptest.NewRecorder()
+        req := httptest.NewRequest(http.MethodPost, "/users/register", bytes.NewReader(b))
+        req.Header.Set("Content-Type", "application/json")
+        r.ServeHTTP(w, req)
+        if w.Code != http.StatusCreated {
+            t.Fatalf("register failed: %d", w.Code)
         }
-    case <-time.After(time.Second):
-        t.Fatal("timeout waiting for OrderPlaced event")
     }
 
-    // Accept → expect OrderAccepted
-    w = httptest.NewRecorder()
-    req = httptest.NewRequest(http.MethodPatch, "/orders/o1/accept", nil)
-    r.ServeHTTP(w, req)
-    if w.Code != http.StatusOK {
-        t.Fatalf("expected 200, got %d", w.Code)
-    }
-
-    select {
-    case evt := <-bus:
-        if evt.Type != "OrderAccepted" {
-            t.Fatalf("expected OrderAccepted, got %s", evt.Type)
+    var token string
+    {
+        login := map[string]string{
+            "email":    "tom@ex.com",
+            "password": "pw",
         }
-    case <-time.After(time.Second):
-        t.Fatal("timeout waiting for OrderAccepted event")
+        b, _ := json.Marshal(login)
+        w := httptest.NewRecorder()
+        req := httptest.NewRequest(http.MethodPost, "/users/login", bytes.NewReader(b))
+        req.Header.Set("Content-Type", "application/json")
+        r.ServeHTTP(w, req)
+        if w.Code != http.StatusOK {
+            t.Fatalf("login failed: %d", w.Code)
+        }
+        var resp struct {
+            Token string `json:"token"`
+        }
+        _ = json.Unmarshal(w.Body.Bytes(), &resp)
+        token = resp.Token
+    }
+
+    // Step 4: Create an order
+    {
+        orderPayload := map[string]interface{}{
+            "listingIds": []string{"l1"},
+            "sellerId":   "s1",
+            "total":      10.0,
+        }
+        b, _ := json.Marshal(orderPayload)
+        w := httptest.NewRecorder()
+        req := httptest.NewRequest(http.MethodPost, "/orders", bytes.NewReader(b))
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("Authorization", "Bearer "+token)
+        r.ServeHTTP(w, req)
+
+        if w.Code != http.StatusCreated {
+            t.Fatalf("expected 201, got %d, body %s", w.Code, w.Body.String())
+        }
+
+        select {
+        case evt := <-bus:
+            if evt.Type != "OrderPlaced" {
+                t.Fatalf("expected OrderPlaced, got %s", evt.Type)
+            }
+        case <-time.After(time.Second):
+            t.Fatal("timeout waiting for OrderPlaced event")
+        }
+    }
+
+    // Step 5: Accept the order
+    {
+        w := httptest.NewRecorder()
+        req := httptest.NewRequest(http.MethodPatch, "/orders/o1/accept", nil)
+        req.Header.Set("Authorization", "Bearer "+token)
+        r.ServeHTTP(w, req)
+
+        if w.Code != http.StatusOK {
+            t.Fatalf("expected 200, got %d", w.Code)
+        }
+
+        select {
+        case evt := <-bus:
+            if evt.Type != "OrderAccepted" {
+                t.Fatalf("expected OrderAccepted, got %s", evt.Type)
+            }
+        case <-time.After(time.Second):
+            t.Fatal("timeout waiting for OrderAccepted event")
+        }
     }
 }
+
 
 // -----------------------------------------------------------------------------
 // CONCURRENCY test for Seller.Register (race‑safety)
