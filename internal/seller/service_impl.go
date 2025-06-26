@@ -6,13 +6,6 @@ import (
 	"sync"
 )
 
-// Seller represents a marketplace seller.
-type Seller struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // In-memory implementation
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,15 +32,15 @@ func (s *inMemoryService) Register(sl Seller) error {
 	return nil
 }
 
-func (s *inMemoryService) GetByID(id string) (Seller, error) {
+func (s *inMemoryService) GetByID(id string) (*Seller, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	sl, ok := s.sellers[id]
 	if !ok {
-		return Seller{}, errors.New("seller not found")
+		return nil, errors.New("seller not found")
 	}
-	return sl, nil
+	return &sl, nil
 }
 
 func (s *inMemoryService) ListAll() []Seller {
@@ -58,7 +51,6 @@ func (s *inMemoryService) ListAll() []Seller {
 	for _, v := range s.sellers {
 		out = append(out, v)
 	}
-	// deterministic order helps tests
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
 }
