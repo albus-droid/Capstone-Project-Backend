@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/albus-droid/Capstone-Project-Backend/internal/event"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/listing"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/order"
