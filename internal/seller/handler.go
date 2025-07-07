@@ -2,14 +2,18 @@ package seller
 
 import (
     "net/http"
+    "time"
+
+    "github.com/albus-droid/Capstone-Project-Backend/internal/auth"
     "github.com/gin-gonic/gin"
+    "github.com/golang-jwt/jwt/v4"
 )
 
 // RegisterRoutes mounts seller endpoints under /sellers
 func RegisterRoutes(r *gin.Engine, svc Service) {
     grp := r.Group("/sellers")
 
-    // POST /sellers/register
+    // Register
     grp.POST("/register", func(c *gin.Context) {
         var s Seller
         if err := c.ShouldBindJSON(&s); err != nil {
@@ -23,7 +27,40 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
         c.JSON(http.StatusCreated, gin.H{"message": "seller registered"})
     })
 
-    // GET /sellers/:id
+    // Login → returns JWT
+    grp.POST("/login", func(c *gin.Context) {
+        var creds struct {
+            Email    string `json:"email"`
+            Password string `json:"password"`
+        }
+        if err := c.ShouldBindJSON(&creds); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+            return
+        }
+
+        // Authenticate against your seller service
+        seller, err := svc.Authenticate(creds.Email, creds.Password)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+            return
+        }
+
+        // Create JWT with seller’s email (or ID) as subject
+        token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+            "sub": seller.Email,
+            "exp": time.Now().Add(24 * time.Hour).Unix(),
+        })
+
+        signed, err := token.SignedString(auth.Secret())
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "could not sign token"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"token": signed})
+    })
+
+    // Fetch a seller by ID
     grp.GET("/:id", func(c *gin.Context) {
         id := c.Param("id")
         seller, err := svc.GetByID(id)
@@ -34,7 +71,7 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
         c.JSON(http.StatusOK, seller)
     })
 
-    // GET /sellers (list all)
+    // List all sellers
     grp.GET("", func(c *gin.Context) {
         all := svc.ListAll()
         c.JSON(http.StatusOK, all)
