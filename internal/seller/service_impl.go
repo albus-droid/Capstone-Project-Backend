@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,4 +54,23 @@ func (s *inMemoryService) ListAll() []Seller {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
+}
+
+func (s *inMemoryService) Authenticate(email, pw string) (*Seller, error) {
+  u, err := s.GetByEmail(email)
+  if err != nil {
+    return nil, err
+  }
+  if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(pw)); err != nil {
+    return nil, errors.New("invalid credentials")
+  }
+  return u, nil
+}
+
+func (s *inMemoryService) GetByEmail(email string) (*Seller, error) {
+  u, ok := s.sellers[email]
+  if !ok {
+    return nil, errors.New("seller not found")
+  }
+  return &u, nil
 }
