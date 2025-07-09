@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: 17.5-alpine3.22    # Alpine-based PostgreSQL
+    image: postgres:17.5-alpine3.22    # Alpine-based PostgreSQL
     container_name: postgres
     restart: always
     shm_size: 128mb              # shared memory limit
