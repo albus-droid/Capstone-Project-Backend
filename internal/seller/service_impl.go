@@ -26,9 +26,15 @@ func (s *inMemoryService) Register(sl Seller) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.sellers[sl.ID]; exists {
+	if _, exists := s.sellers[sl.Email]; exists {
 		return errors.New("seller already exists")
 	}
+	// hash password
+	h, err := bcrypt.GenerateFromPassword([]byte(sl.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	sl.Password = string(h)
 	s.sellers[sl.ID] = sl
 	return nil
 }
