@@ -1,0 +1,74 @@
+services:
+  db:
+    image: postgres:17.5-alpine3.22    # Alpine-based PostgreSQL
+    container_name: postgres
+    restart: always
+    shm_size: 128mb              # shared memory limit
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"         # Expose PostgreSQL port  
+    healthcheck:      # Health check for PostgreSQL
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 30s
+      timeout: 10s
+      retries: 5  
+    logging:  # Logging configuration
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: 
+      - backend # Define a network for the database
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  
+  backend:  
+    build: .                       # Build from Dockerfile in current directory   
+    container_name: backend
+    restart: always 
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"               # Expose backend port
+    environment:
+      DATABASE_URL: postgres://admin:example@db:5432/mydatabase
+    networks:
+      - backend                   # Connect to the backend network
+    logging:  # Logging configuration
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:8.0.3-alpine          # Alpine-based Redis
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks: 
+      - backend                     # Connect to the backend network      
+    healthcheck:      # Health check for Redis
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    logging:  # Logging configuration
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Define a network for the backend services
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
