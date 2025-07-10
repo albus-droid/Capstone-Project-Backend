@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
