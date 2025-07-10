@@ -111,91 +111,143 @@ Authorization: Bearer <JWT_TOKEN>
 
 ---
 
+Excellent — let’s get it super clear and **Markdown-only**. Below is a version with no extra commentary or half-markup code fences, fully valid Markdown so you can drop it directly into a `.md` file or paste it into any Markdown viewer or renderer (like on GitHub).
+
+**Here’s the pure Markdown file content, ready for download or pasting:**
+
+---
+
 ## 2. Sellers
 
 ### 2.1 Register Seller
 
 * **Endpoint**: `POST /sellers/register`
+* **Description**: Create a new seller account.
 
-* **Description**: Create a new seller.
+#### Request Body
 
-* **Request Body (JSON)**:
+| Field    | Type   | Required | Description                        |
+| -------- | ------ | -------- | ---------------------------------- |
+| name     | string | yes      | Seller’s display name              |
+| email    | string | yes      | Contact email (must be unique)     |
+| phone    | string | yes      | Phone number                       |
+| password | string | yes      | Plain-text password (min length 8) |
 
-  | Field | Type   | Required | Description   |
-  | ----- | ------ | -------- | ------------- |
-  | name  | string | yes      | Seller's name |
-  | email | string | yes      | Contact email |
-  | phone | string | yes      | Phone number  |
+#### Example Request
 
-* **Example Request**:
+```http
+POST /sellers/register HTTP/1.1
+Content-Type: application/json
 
-  ```http
-  POST /sellers/register HTTP/1.1
-  Content-Type: application/json
+{
+  "name": "Bob’s Burgers",
+  "email": "bob@burgers.com",
+  "phone": "+1-555-1234",
+  "password": "hunter2!"
+}
+```
 
-  {
-    "name": "Bob’s Burgers",
-    "email": "bob@burgers.com",
-    "phone": "+1-555-1234"
-  }
-  ```
+#### Responses
 
-* **Example Response** (`201 Created`):
+**201 Created**
 
-  ```json
-  { "message": "seller registered" }
-  ```
+```json
+{
+  "message": "seller registered",
+  "id": "123e4567-e89b-12d3-a456-426614174000"
+}
+```
+
+**409 Conflict** (email already exists)
+
+```json
+{
+  "error": "seller already exists"
+}
+```
+
+**400 Bad Request** (validation error)
+
+```json
+{
+  "error": "invalid request payload"
+}
+```
+
+---
 
 ### 2.2 Get Seller by ID
 
 * **Endpoint**: `GET /sellers/{id}`
+* **Description**: Fetch a seller’s public details.
 
-* **Description**: Fetch a seller’s details.
+#### Path Parameters
 
-* **Path Parameters**:
+| Name | Type   | Description |
+| ---- | ------ | ----------- |
+| id   | string | Seller UUID |
 
-  | Name | Type   | Description |
-  | ---- | ------ | ----------- |
-  | id   | string | Seller UUID |
+#### Example Request
 
-* **Example Request**:
+```http
+GET /sellers/123e4567-e89b-12d3-a456-426614174000 HTTP/1.1
+```
 
-  ```http
-  GET /sellers/123e4567-e89b-12d3-a456-426614174000 HTTP/1.1
-  ```
+#### Responses
 
-* **Example Response** (`200 OK`):
+**200 OK**
 
-  ```json
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "name": "Bob’s Burgers",
+  "email": "bob@burgers.com",
+  "phone": "+1-555-1234",
+  "verified": false
+}
+```
+
+**404 Not Found**
+
+```json
+{
+  "error": "seller not found"
+}
+```
+
+---
+
+### 2.3 List All Sellers
+
+* **Endpoint**: `GET /sellers`
+* **Description**: Retrieve a sorted list of all sellers (by ID).
+
+#### Example Request
+
+```http
+GET /sellers HTTP/1.1
+```
+
+#### Response (200 OK)
+
+```json
+[
   {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "name": "Bob’s Burgers",
     "email": "bob@burgers.com",
     "phone": "+1-555-1234",
     "verified": false
+  },
+  {
+    "id": "223e4567-e89b-12d3-a456-426614174001",
+    "name": "Alice’s Empanadas",
+    "email": "alice@empanadas.com",
+    "phone": "+1-555-5678",
+    "verified": true
   }
-  ```
-
-### 2.3 List All Sellers
-
-* **Endpoint**: `GET /sellers`
-
-* **Description**: Retrieve a list of all sellers.
-
-* **Example Request**:
-
-  ```http
-  GET /sellers HTTP/1.1
-  ```
-
-* **Example Response** (`200 OK`):
-
-  ```json
-  [
-    { /* seller 1 */ },
-    { /* seller 2 */ }
-  ]
-  ```
+]
+```
 
 ---
 
