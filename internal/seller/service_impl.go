@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -13,7 +14,7 @@ import (
 
 type inMemoryService struct {
 	mu      sync.Mutex
-	sellers map[string]Seller // keyed by Seller.ID
+	sellers map[string]Seller // keyed by Seller.Email
 }
 
 func NewInMemoryService() Service {
@@ -29,13 +30,18 @@ func (s *inMemoryService) Register(sl Seller) error {
 	if _, exists := s.sellers[sl.Email]; exists {
 		return errors.New("seller already exists")
 	}
+
+	// Assign new UUID
+    sl.ID = uuid.New().String()
+    
 	// hash password
 	h, err := bcrypt.GenerateFromPassword([]byte(sl.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 	sl.Password = string(h)
-	s.sellers[sl.ID] = sl
+	sl.Verified = false
+	s.sellers[sl.Email] = sl
 	return nil
 }
 
@@ -43,11 +49,12 @@ func (s *inMemoryService) GetByID(id string) (*Seller, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	sl, ok := s.sellers[id]
-	if !ok {
-		return nil, errors.New("seller not found")
-	}
-	return &sl, nil
+	for _, sl := range s.sellers {
+        if sl.ID == id {
+            return &sl, nil
+        }
+    }
+	return nil, errors.New("seller not found")
 }
 
 func (s *inMemoryService) ListAll() []Seller {
@@ -74,9 +81,12 @@ func (s *inMemoryService) Authenticate(email, pw string) (*Seller, error) {
 }
 
 func (s *inMemoryService) GetByEmail(email string) (*Seller, error) {
-  u, ok := s.sellers[email]
-  if !ok {
-    return nil, errors.New("seller not found")
-  }
-  return &u, nil
+ s.mu.Lock()
+    defer s.mu.Unlock()
+
+    sl, ok := s.sellers[email]
+    if !ok {
+        return nil, errors.New("seller not found")
+    }
+    return &sl, nil
 }
