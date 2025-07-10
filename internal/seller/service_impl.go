@@ -29,7 +29,7 @@ func (s *inMemoryService) Register(sl Seller) error {
 	if _, exists := s.sellers[sl.Email]; exists {
 		return errors.New("seller already exists")
 	}
-	
+
 	// Assign new UUID
     sl.ID := uuid.New().String()
     
@@ -39,6 +39,7 @@ func (s *inMemoryService) Register(sl Seller) error {
 		return err
 	}
 	sl.Password = string(h)
+	sl.Verified = false
 	s.sellers[sl.Email] = sl
 	return nil
 }
