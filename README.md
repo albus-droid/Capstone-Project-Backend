@@ -108,29 +108,22 @@ Authorization: Bearer <JWT_TOKEN>
     "email": "alice@example.com"
   }
   ```
-
+  
 ---
-
-Excellent — let’s get it super clear and **Markdown-only**. Below is a version with no extra commentary or half-markup code fences, fully valid Markdown so you can drop it directly into a `.md` file or paste it into any Markdown viewer or renderer (like on GitHub).
-
-**Here’s the pure Markdown file content, ready for download or pasting:**
-
----
-
 ## 2. Sellers
 
 ### 2.1 Register Seller
 
-* **Endpoint**: `POST /sellers/register`
-* **Description**: Create a new seller account.
+- **Endpoint**: `POST /sellers/register`
+- **Description**: Create a new seller account.
 
 #### Request Body
 
-| Field    | Type   | Required | Description                        |
-| -------- | ------ | -------- | ---------------------------------- |
-| name     | string | yes      | Seller’s display name              |
-| email    | string | yes      | Contact email (must be unique)     |
-| phone    | string | yes      | Phone number                       |
+| Field    | Type   | Required | Description                     |
+| -------- | ------ | -------- | ------------------------------- |
+| name     | string | yes      | Seller’s display name           |
+| email    | string | yes      | Contact email (must be unique)  |
+| phone    | string | yes      | Phone number                    |
 | password | string | yes      | Plain-text password (min length 8) |
 
 #### Example Request
@@ -145,7 +138,7 @@ Content-Type: application/json
   "phone": "+1-555-1234",
   "password": "hunter2!"
 }
-```
+````
 
 #### Responses
 
@@ -153,8 +146,7 @@ Content-Type: application/json
 
 ```json
 {
-  "message": "seller registered",
-  "id": "123e4567-e89b-12d3-a456-426614174000"
+  "message": "seller registered"
 }
 ```
 
@@ -176,10 +168,62 @@ Content-Type: application/json
 
 ---
 
-### 2.2 Get Seller by ID
+### 2.2 Seller Login
+
+* **Endpoint**: `POST /sellers/login`
+* **Description**: Authenticates a seller and returns a JWT token for future authenticated requests.
+
+#### Request Body
+
+| Field    | Type   | Required | Description          |
+| -------- | ------ | -------- | -------------------- |
+| email    | string | yes      | Seller email address |
+| password | string | yes      | Plain-text password  |
+
+#### Example Request
+
+```http
+POST /sellers/login HTTP/1.1
+Content-Type: application/json
+
+{
+  "email": "bob@burgers.com",
+  "password": "hunter2!"
+}
+```
+
+#### Responses
+
+**200 OK**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+}
+```
+
+**401 Unauthorized** (invalid credentials)
+
+```json
+{
+  "error": "invalid credentials"
+}
+```
+
+**400 Bad Request** (invalid request format)
+
+```json
+{
+  "error": "invalid request payload"
+}
+```
+
+---
+
+### 2.3 Get Seller by ID
 
 * **Endpoint**: `GET /sellers/{id}`
-* **Description**: Fetch a seller’s public details.
+* **Description**: Fetch a seller’s public details by their unique ID.
 
 #### Path Parameters
 
@@ -211,16 +255,16 @@ GET /sellers/123e4567-e89b-12d3-a456-426614174000 HTTP/1.1
 
 ```json
 {
-  "error": "seller not found"
+  "error": "not found"
 }
 ```
 
 ---
 
-### 2.3 List All Sellers
+### 2.4 List All Sellers
 
 * **Endpoint**: `GET /sellers`
-* **Description**: Retrieve a sorted list of all sellers (by ID).
+* **Description**: Retrieve a list of all sellers, sorted by ID.
 
 #### Example Request
 
@@ -247,62 +291,6 @@ GET /sellers HTTP/1.1
     "verified": true
   }
 ]
-```
-
----
-
-### 2.4 Seller Login
-
-* **Endpoint**: `POST /sellers/login`
-* **Description**: Authenticates a seller and returns their account details.
-
-#### Request Body
-
-| Field    | Type   | Required | Description          |
-| -------- | ------ | -------- | -------------------- |
-| email    | string | yes      | Seller email address |
-| password | string | yes      | Plain-text password  |
-
-#### Example Request
-
-```http
-POST /sellers/login HTTP/1.1
-Content-Type: application/json
-
-{
-  "email": "bob@burgers.com",
-  "password": "hunter2!"
-}
-```
-
-#### Responses
-
-**200 OK**
-
-```json
-{
-  "id": "123e4567-e89b-12d3-a456-426614174000",
-  "name": "Bob’s Burgers",
-  "email": "bob@burgers.com",
-  "phone": "+1-555-1234",
-  "verified": false
-}
-```
-
-**401 Unauthorized** (invalid credentials)
-
-```json
-{
-  "error": "invalid credentials"
-}
-```
-
-**404 Not Found** (email not registered)
-
-```json
-{
-  "error": "seller not found"
-}
 ```
 
 ---
