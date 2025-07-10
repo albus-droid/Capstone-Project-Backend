@@ -43,11 +43,12 @@ func (s *inMemoryService) GetByID(id string) (*Seller, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	sl, ok := s.sellers[id]
-	if !ok {
-		return nil, errors.New("seller not found")
-	}
-	return &sl, nil
+	for _, sl := range s.sellers {
+        if sl.ID == id {
+            return &sl, nil
+        }
+    }
+	return nil, errors.New("seller not found")
 }
 
 func (s *inMemoryService) ListAll() []Seller {
