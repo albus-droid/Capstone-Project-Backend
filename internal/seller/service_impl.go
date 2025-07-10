@@ -75,9 +75,12 @@ func (s *inMemoryService) Authenticate(email, pw string) (*Seller, error) {
 }
 
 func (s *inMemoryService) GetByEmail(email string) (*Seller, error) {
-  u, ok := s.sellers[email]
-  if !ok {
-    return nil, errors.New("seller not found")
-  }
-  return &u, nil
+ s.mu.Lock()
+    defer s.mu.Unlock()
+
+    sl, ok := s.sellers[email]
+    if !ok {
+        return nil, errors.New("seller not found")
+    }
+    return &sl, nil
 }
