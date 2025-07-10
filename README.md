@@ -251,6 +251,62 @@ GET /sellers HTTP/1.1
 
 ---
 
+### 2.4 Seller Login
+
+* **Endpoint**: `POST /sellers/login`
+* **Description**: Authenticates a seller and returns their account details.
+
+#### Request Body
+
+| Field    | Type   | Required | Description          |
+| -------- | ------ | -------- | -------------------- |
+| email    | string | yes      | Seller email address |
+| password | string | yes      | Plain-text password  |
+
+#### Example Request
+
+```http
+POST /sellers/login HTTP/1.1
+Content-Type: application/json
+
+{
+  "email": "bob@burgers.com",
+  "password": "hunter2!"
+}
+```
+
+#### Responses
+
+**200 OK**
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "name": "Bob’s Burgers",
+  "email": "bob@burgers.com",
+  "phone": "+1-555-1234",
+  "verified": false
+}
+```
+
+**401 Unauthorized** (invalid credentials)
+
+```json
+{
+  "error": "invalid credentials"
+}
+```
+
+**404 Not Found** (email not registered)
+
+```json
+{
+  "error": "seller not found"
+}
+```
+
+---
+
 ## 3. Listings
 
 ### 3.1 Create Listing
