@@ -29,6 +29,10 @@ func (s *inMemoryService) Register(sl Seller) error {
 	if _, exists := s.sellers[sl.Email]; exists {
 		return errors.New("seller already exists")
 	}
+	
+	// Assign new UUID
+    sl.ID := uuid.New().String()
+    
 	// hash password
 	h, err := bcrypt.GenerateFromPassword([]byte(sl.Password), bcrypt.DefaultCost)
 	if err != nil {
