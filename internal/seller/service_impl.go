@@ -13,7 +13,7 @@ import (
 
 type inMemoryService struct {
 	mu      sync.Mutex
-	sellers map[string]Seller // keyed by Seller.ID
+	sellers map[string]Seller // keyed by Seller.Email
 }
 
 func NewInMemoryService() Service {
@@ -35,7 +35,7 @@ func (s *inMemoryService) Register(sl Seller) error {
 		return err
 	}
 	sl.Password = string(h)
-	s.sellers[sl.ID] = sl
+	s.sellers[sl.Email] = sl
 	return nil
 }
 
