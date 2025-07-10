@@ -32,7 +32,7 @@ func (s *inMemoryService) Register(sl Seller) error {
 	}
 
 	// Assign new UUID
-    sl.ID := uuid.New().String()
+    sl.ID = uuid.New().String()
     
 	// hash password
 	h, err := bcrypt.GenerateFromPassword([]byte(sl.Password), bcrypt.DefaultCost)
