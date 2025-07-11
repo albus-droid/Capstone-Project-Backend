@@ -1,6 +1,9 @@
 package listing
 
-import "errors"
+import {
+    "errors"
+	"github.com/google/uuid"
+}
 
 type inMemoryService struct {
     items map[string]Listing
@@ -13,6 +16,9 @@ func NewInMemoryService() Service {
 }
 
 func (s *inMemoryService) Create(l Listing) error {
+
+    l.ID = uuid.New().String()
+
     if _, exists := s.items[l.ID]; exists {
         return errors.New("listing already exists")
     }
