@@ -1,9 +1,9 @@
 package listing
 
-import {
+import (
     "errors"
-	"github.com/google/uuid"
-}
+    "github.com/google/uuid"
+)
 
 type inMemoryService struct {
     items map[string]Listing
