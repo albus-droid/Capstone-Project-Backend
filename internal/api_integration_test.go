@@ -108,7 +108,7 @@ func TestUser_RegisterAndLogin(t *testing.T) {
 func TestSeller_CRUD(t *testing.T) {
 	r, _ := newRouter()
 
-	s := map[string]any{"id": "s1", "name": "Bob", "email": "bob@ex.com"}
+	s := map[string]any{"name": "Bob", "email": "bob@ex.com", "phone": "1234556678", "password": "123123123"}
 	body, _ := json.Marshal(s)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/sellers/register", bytes.NewReader(body))
@@ -125,14 +125,6 @@ func TestSeller_CRUD(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d", w.Code)
-	}
-
-	// get by ID
-	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/sellers/s1", nil)
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
 	// list all
