@@ -131,8 +131,8 @@ func TestSeller_CRUD(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/sellers", nil)
 	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "s1") {
-		t.Fatalf("list all failed: status %d body %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Bob") {
+    t.Fatalf("list all failed: status %d body %s", w.Code, w.Body.String())
 	}
 }
 
