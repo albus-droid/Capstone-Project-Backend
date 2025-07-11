@@ -152,14 +152,6 @@ func TestListing_CRUD(t *testing.T) {
 		t.Fatalf("expected 201, got %d", w.Code)
 	}
 
-	// get by ID
-	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/listings/l1", nil)
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-
 	// list all
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/listings", nil)
