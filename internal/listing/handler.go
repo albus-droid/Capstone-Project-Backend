@@ -6,17 +6,6 @@ import (
     "github.com/gin-gonic/gin"
 )
 
-// Service defines the methods our handlers expect.
-// Make sure your implementation has Create, GetByID, ListBySeller, ListAll,
-// Update(id string, l Listing) error, and Delete(id string) error.
-type Service interface {
-    Create(l Listing) error
-    GetByID(id string) (Listing, error)
-    ListBySeller(sellerID string) ([]Listing, error)
-    ListAll() []Listing
-    Update(id string, l Listing) error
-    Delete(id string) error
-}
 
 // RegisterRoutes mounts listing endpoints under /listings
 func RegisterRoutes(r *gin.Engine, svc Service) {
