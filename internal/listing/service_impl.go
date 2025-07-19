@@ -51,3 +51,22 @@ func (s *inMemoryService) ListAll() []Listing {
     }
     return all
 }
+
+func (s *inMemoryService) Update(id string, l Listing) error {
+    if _, ok := s.items[id]; !ok {
+        return errors.New("listing not found")
+    }
+    // ensure the ID stays the same
+    l.ID = id
+    s.items[id] = l
+    return nil
+}
+
+func (s *inMemoryService) Delete(id string) error {
+    if _, ok := s.items[id]; !ok {
+        return errors.New("listing not found")
+    }
+    delete(s.items, id)
+    return nil
+}
+
