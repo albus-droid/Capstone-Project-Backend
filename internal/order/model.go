@@ -8,7 +8,7 @@ import (
 // swagger:model Order
 // gorm.Model is not embedded so we control fields explicitly
 type Order struct {
-    ID         string         `json:"id" gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
+    ID         string         `json:"id" gorm:"type:uuid;primaryKey"`
     UserID     string         `json:"userId" gorm:"type:uuid;not null;index"`
     UserEmail  string         `json:"user_email" gorm:"type:varchar(100);not null;index"`
     SellerID   string         `json:"sellerId" gorm:"type:uuid;not null;index"`
