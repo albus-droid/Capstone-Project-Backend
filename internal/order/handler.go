@@ -26,13 +26,19 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 		}
 
 		email := c.GetString(string(auth.CtxEmailKey))
-		o := Order{
+        u, err := userSvc.GetByEmail(email)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
+            return
+        }
+		o := &Order{
+			UserID:     u.ID,
 			UserEmail:  email,
 			SellerID:   payload.SellerID,
 			ListingIDs: payload.ListingIDs,
 			Total:      payload.Total,
 		}
-		if err := svc.Create(&o); err != nil {
+		if err := svc.Create(o); err != nil {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
