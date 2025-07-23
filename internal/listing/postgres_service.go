@@ -56,9 +56,23 @@ func (s *postgresService) ListAll() []Listing {
 }
 
 func (s *postgresService) Update(id string, l Listing) error {
-    l.ID = id
-    return s.db.Save(&l).Error
+    // l.ID = id             // no need if you never insert
+    // Update only the non‑zero fields in l for the row with this ID
+    result := s.db.
+        Model(&Listing{}).
+        Where("id = ?", id).
+        Updates(l)
+
+    if result.Error != nil {
+        return result.Error
+    }
+    // Optionally: return ErrRecordNotFound if no rows were affected
+    if result.RowsAffected == 0 {
+        return gorm.ErrRecordNotFound
+    }
+    return nil
 }
+
 
 func (s *postgresService) Delete(id string) error {
     return s.db.Delete(&Listing{}, "id = ?", id).Error
