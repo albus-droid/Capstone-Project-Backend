@@ -7,7 +7,7 @@ import (
 )
 
 type Seller struct {
-    ID        uuid.UUID      `json:"id" gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
+    ID        string         `json:"id" gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
     Name      string         `json:"name" gorm:"type:varchar(100);not null"`
     Email     string         `json:"email" gorm:"type:varchar(100);uniqueIndex;not null"`
     Password  string         `json:"password" gorm:"not null"`       // store a bcrypt hash
