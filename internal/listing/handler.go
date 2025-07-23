@@ -18,7 +18,7 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
             c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
             return
         }
-        if err := svc.Create(l); err != nil {
+        if err := svc.Create(&l); err != nil {
             c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
             return
         }
