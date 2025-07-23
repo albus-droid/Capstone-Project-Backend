@@ -58,10 +58,10 @@ func newRouter() (*gin.Engine, struct {
 		lsvc listing.Service
 		osvc order.Service
 	}{
-		usvc: user.NewInMemoryService(),
-		ssvc: seller.NewInMemoryService(),
-		lsvc: listing.NewInMemoryService(),
-		osvc: order.NewInMemoryService(),
+		usvc: user.NewPostgresService(),
+		ssvc: seller.NewPostgresService(),
+		lsvc: listing.NewPostgresService(),
+		osvc: order.NewPostgresService(),
 	}
 
 	r := gin.New()
