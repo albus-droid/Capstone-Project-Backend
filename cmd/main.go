@@ -8,6 +8,8 @@ import (
 	"github.com/albus-droid/Capstone-Project-Backend/internal/seller"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/user"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/db"
+	"github.com/albus-droid/Capstone-Project-Backend/internal/auth"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,17 +26,17 @@ func main() {
 	// seller routes
 	seller.Migrate(db) // optional for dev
 	ssvc := seller.NewPostgresService(db)
-	seller.RegisterRoutes(r, ssvc, redisStore)
+	seller.RegisterRoutes(r, ssvc)
 
 	// Listing routes
 	listing.Migrate(db) // optional for dev
 	lsvc := listing.NewPostgresService(db)
-	listing.RegisterRoutes(r, lsvc, redisStore)
+	listing.RegisterRoutes(r, lsvc)
 
 	// Order
 	order.Migrate(db) // optional for dev
 	osvc := order.NewPostgresService(db)
-	order.RegisterRoutes(r, osvc, redisStore)
+	order.RegisterRoutes(r, osvc)
 
 	startNotificationListener()
 	r.Run(":8000") // http://localhost:8080

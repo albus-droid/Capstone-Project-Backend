@@ -1,4 +1,4 @@
-package tokenstore
+package auth
 
 import (
     "context"
@@ -9,6 +9,12 @@ import (
 
 type RedisStore struct {
     rdb *redis.Client
+}
+
+type Store interface {
+  Save(ctx context.Context, token string, ttl time.Duration) error
+  Exists(ctx context.Context, token string) (bool, error)
+  Delete(ctx context.Context, token string) error
 }
 
 func NewRedisStore(addr, pass string, db int) *RedisStore {

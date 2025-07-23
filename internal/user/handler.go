@@ -10,7 +10,7 @@ import (
 )
 
 // RegisterRoutes mounts user endpoints under /users
-func RegisterRoutes(r *gin.Engine, svc Service) {
+func RegisterRoutes(r *gin.Engine, svc Service, store auth.Store) {
 	g := r.Group("/users")
 
 	// Register
@@ -53,11 +53,15 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 			return
 		}
 
-        // save it in Redis
-        if err := ts.Save(c.Request.Context(), tsStr, time.Until(exp)); err != nil {
-            // log but don’t block response
-            c.Error(err)
-        }
+		// 2) compute TTL (so we can expire it in Redis)
+		expiresAt := time.Unix(token.Claims.(jwt.MapClaims)["exp"].(int64), 0)
+		ttl := time.Until(expiresAt)
+
+		// 3) save in Redis
+		if err := store.Save(c.Request.Context(), ts, ttl); err != nil {
+			// optional: log it but don’t block the response
+			c.Error(err)
+		}
 
 		c.JSON(http.StatusOK, gin.H{"token": ts})
 	})
