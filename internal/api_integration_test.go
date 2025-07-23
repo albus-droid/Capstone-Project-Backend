@@ -399,4 +399,7 @@ func TestOrderLifecycle(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+lresp.Token)
 	res, _ = http.DefaultClient.Do(req)
 	mustDecode(t, res, &or)
-	if or.Status != "completed"
+	if or.Status != "completed" {
+		t.Fatalf("order status after complete = %q; want completed", or.Status)
+	}
+}
