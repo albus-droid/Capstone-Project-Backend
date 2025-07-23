@@ -16,7 +16,7 @@ type Order struct {
     SellerID   string         `json:"sellerId" gorm:"type:uuid;not null;index"`
     ListingIDs []string       `json:"listingIds" gorm:"type:jsonb;not null;default:'[]'"`
     Total      float64        `json:"total" gorm:"type:numeric;not null"`
-    CreatedAt  time.Time      `json:"createdAt" gorm:"autoCreateTime"`
+    CreatedAt  int64          `json:"createdAt" gorm:"autoCreateTime"`
     Status     string         `json:"status" gorm:"type:varchar(20);not null;default:'pending'"`
     DeletedAt  gorm.DeletedAt `json:"-" gorm:"index"` // optional soft-delete
 }
