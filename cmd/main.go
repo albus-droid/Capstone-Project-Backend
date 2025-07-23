@@ -14,26 +14,27 @@ import (
 func main() {
 	r := gin.Default()
 	db := db.Init()
+	redisStore := auth.NewRedisStore("redis:6379", "", 0)
 
 	// user routes
 	user.Migrate(db) // optional for dev
 	usvc := user.NewPostgresService(db)
-	user.RegisterRoutes(r, usvc)
+	user.RegisterRoutes(r, usvc, redisStore)
 
 	// seller routes
 	seller.Migrate(db) // optional for dev
 	ssvc := seller.NewPostgresService(db)
-	seller.RegisterRoutes(r, ssvc)
+	seller.RegisterRoutes(r, ssvc, redisStore)
 
 	// Listing routes
 	listing.Migrate(db) // optional for dev
 	lsvc := listing.NewPostgresService(db)
-	listing.RegisterRoutes(r, lsvc)
+	listing.RegisterRoutes(r, lsvc, redisStore)
 
 	// Order
 	order.Migrate(db) // optional for dev
 	osvc := order.NewPostgresService(db)
-	order.RegisterRoutes(r, osvc)
+	order.RegisterRoutes(r, osvc, redisStore)
 
 	startNotificationListener()
 	r.Run(":8000") // http://localhost:8080

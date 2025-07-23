@@ -52,6 +52,13 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not sign token"})
 			return
 		}
+
+        // save it in Redis
+        if err := ts.Save(c.Request.Context(), tsStr, time.Until(exp)); err != nil {
+            // log but don’t block response
+            c.Error(err)
+        }
+
 		c.JSON(http.StatusOK, gin.H{"token": ts})
 	})
 
