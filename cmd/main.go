@@ -21,7 +21,8 @@ func main() {
 	user.RegisterRoutes(r, usvc)
 
 	// seller routes
-	ssvc := seller.NewInMemoryService()
+	seller.Migrate(db) // optional for dev
+	ssvc := seller.NewPostgresService(db)
 	seller.RegisterRoutes(r, ssvc)
 
 	// Listing routes
