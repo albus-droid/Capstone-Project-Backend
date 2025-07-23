@@ -10,7 +10,7 @@ import (
 )
 
 // RegisterRoutes mounts seller endpoints under /sellers
-func RegisterRoutes(r *gin.Engine, svc Service) {
+func RegisterRoutes(r *gin.Engine, svc Service, store auth.Store) {
     grp := r.Group("/sellers")
 
     // Register
@@ -55,6 +55,14 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "could not sign token"})
             return
+        }
+
+        // compute TTL from "exp" claim
+        exp := time.Unix(token.Claims.(jwt.MapClaims)["exp"].(int64), 0)
+        ttl := time.Until(exp)
+        // persist it in Redis
+        if err := store.Save(c.Request.Context(), signed, ttl); err != nil {
+            c.Error(err) // log but don’t block
         }
 
         c.JSON(http.StatusOK, gin.H{"token": signed})

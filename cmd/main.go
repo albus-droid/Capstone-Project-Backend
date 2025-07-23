@@ -26,7 +26,7 @@ func main() {
 	// seller routes
 	seller.Migrate(db) // optional for dev
 	ssvc := seller.NewPostgresService(db)
-	seller.RegisterRoutes(r, ssvc)
+	seller.RegisterRoutes(r, ssvc, redisStore)
 
 	// Listing routes
 	listing.Migrate(db) // optional for dev
