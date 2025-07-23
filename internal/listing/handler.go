@@ -10,6 +10,7 @@ import (
 // RegisterRoutes mounts listing endpoints under /listings
 func RegisterRoutes(r *gin.Engine, svc Service) {
     grp := r.Group("/listings")
+    grp.Use(auth.Middleware())
 
     // POST /listings
     grp.POST("", func(c *gin.Context) {
