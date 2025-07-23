@@ -1,9 +1,8 @@
 package user
 
-// the JSON tags let Gin bind & render JSON automatically
 type User struct {
-  ID       string `json:"id"`
+  ID       string `json:"id" gorm:"primaryKey"`
   Name     string `json:"name"`
-  Email    string `json:"email"`
-  Password string `json:"password"` // accept on input, omitted when outputting
+  Email    string `json:"email" gorm:"uniqueIndex;not null"`
+  Password string `json:"password"` // Store hashed passwords
 }

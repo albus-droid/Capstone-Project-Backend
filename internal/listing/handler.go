@@ -18,11 +18,11 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
             c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
             return
         }
-        if err := svc.Create(l); err != nil {
+        if err := svc.Create(&l); err != nil {
             c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
             return
         }
-        c.JSON(http.StatusCreated, gin.H{"message": "listing created"})
+        c.JSON(http.StatusCreated, gin.H{"message": "listing created", "id": l.ID,})
     })
 
     // GET /listings/:id

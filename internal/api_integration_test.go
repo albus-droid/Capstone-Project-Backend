@@ -1,250 +1,456 @@
-// mvp_tests.go – Full coverage for User, Seller, Listing, Order, and Event flow
-// -----------------------------------------------------------------------------
-// Run: go test ./...
-// -----------------------------------------------------------------------------
-package internal_test
+// integration_test.go
+// ----------------------------------------------------------------------------
+// Run: go test -v -timeout 30s integration_test.go
+// ----------------------------------------------------------------------------
+package main
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
-	"strings"
-	"sync"
 	"testing"
 	"time"
-
-	"github.com/albus-droid/Capstone-Project-Backend/internal/auth"
-	"github.com/albus-droid/Capstone-Project-Backend/internal/event"
-	"github.com/albus-droid/Capstone-Project-Backend/internal/listing"
-	"github.com/albus-droid/Capstone-Project-Backend/internal/order"
-	"github.com/albus-droid/Capstone-Project-Backend/internal/seller"
-	"github.com/albus-droid/Capstone-Project-Backend/internal/user"
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v4"
 )
 
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
-
-// ensure we use the same secret everywhere
-func init() { _ = os.Setenv("JWT_SECRET", "replace-with-secure-secret") }
-
-// generateTestToken signs a JWT valid for 1 h
-func generateTestToken(email string) string {
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": email,
-		"exp": time.Now().Add(time.Hour).Unix(),
-	})
-	s, _ := tok.SignedString(auth.Secret())
-	return s
-}
-
-// build a full router with in-memory services wired together
-func newRouter() (*gin.Engine, struct {
-	usvc user.Service
-	ssvc seller.Service
-	lsvc listing.Service
-	osvc order.Service
-}) {
-	gin.SetMode(gin.TestMode)
-
-	svcs := struct {
-		usvc user.Service
-		ssvc seller.Service
-		lsvc listing.Service
-		osvc order.Service
-	}{
-		usvc: user.NewInMemoryService(),
-		ssvc: seller.NewInMemoryService(),
-		lsvc: listing.NewInMemoryService(),
-		osvc: order.NewInMemoryService(),
+var baseURL = func() string {
+	if u := os.Getenv("API_BASE_URL"); u != "" {
+		return u
 	}
+	return "http://127.0.0.1:8000"
+}()
 
-	r := gin.New()
-	r.Use(gin.Recovery())
-
-	user.RegisterRoutes(r, svcs.usvc)
-	seller.RegisterRoutes(r, svcs.ssvc)
-	listing.RegisterRoutes(r, svcs.lsvc)
-	order.RegisterRoutes(r, svcs.osvc)
-
-	return r, svcs
-}
-
-// -----------------------------------------------------------------------------
-// USER MODULE
-// -----------------------------------------------------------------------------
-func TestUser_RegisterAndLogin(t *testing.T) {
-	r, _ := newRouter()
-
-	reg := map[string]string{"id": "u1", "name": "Tom", "email": "tom@ex.com", "password": "pw"}
-	body, _ := json.Marshal(reg)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/users/register", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", w.Code)
-	}
-
-	login := map[string]string{"email": "tom@ex.com", "password": "pw"}
-	body, _ = json.Marshal(login)
-	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/users/login", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
+// mustDecode unmarshals JSON or fails the test
+func mustDecode(t *testing.T, res *http.Response, v interface{}) {
+	t.Helper()
+	defer res.Body.Close()
+	if err := json.NewDecoder(res.Body).Decode(v); err != nil {
+		t.Fatalf("decode %T: %v", v, err)
 	}
 }
 
-// -----------------------------------------------------------------------------
-// SELLER MODULE
-// -----------------------------------------------------------------------------
-func TestSeller_CRUD(t *testing.T) {
-	r, _ := newRouter()
+// =================================================================================
+// 1. Users
+// =================================================================================
 
-	s := map[string]any{"name": "Bob", "email": "bob@ex.com", "phone": "1234556678", "password": "123123123"}
-	body, _ := json.Marshal(s)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/sellers/register", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", w.Code)
-	}
+func TestUsers(t *testing.T) {
+	email := fmt.Sprintf("user+%d@ex.com", time.Now().UnixNano())
+	pass := "p@ssw0rd"
 
-	// duplicate → 409
-	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/sellers/register", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d", w.Code)
-	}
-
-	// list all
-	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/sellers", nil)
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Bob") {
-    t.Fatalf("list all failed: status %d body %s", w.Code, w.Body.String())
-	}
-}
-
-// -----------------------------------------------------------------------------
-// LISTING MODULE
-// -----------------------------------------------------------------------------
-func TestListing_CRUD(t *testing.T) {
-	r, _ := newRouter()
-
-	l := listing.Listing{ID: "l1", SellerID: "s1", Title: "Item", Description: "desc", Price: 9.9, Available: true}
-	body, _ := json.Marshal(l)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/listings", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", w.Code)
-	}
-
-	// list all
-	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/listings", nil)
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// ORDER MODULE + EVENT FLOW
-// -----------------------------------------------------------------------------
-func TestOrder_CreateAndEventFlow(t *testing.T) {
-	// isolated event bus
-	bus := make(chan event.Event, 2)
-	event.Bus = bus
-
-	r, svcs := newRouter()
-
-	// seed seller & listing
-	svcs.ssvc.Register(seller.Seller{ID: "s1", Name: "Bob", Email: "bob@ex.com"})
-	svcs.lsvc.Create(listing.Listing{ID: "l1", SellerID: "s1", Title: "Prod", Price: 10.0})
-
-	// register & login user
-	svcs.usvc.Register(user.User{ID: "u1", Name: "Tom", Email: "tom@ex.com", Password: "pw"})
-	token := generateTestToken("tom@ex.com")
-
-	// create order
+	// 1.1 Register
 	{
-		payload := map[string]any{
-			"id":         "o1",
-			"listingIds": []string{"l1"},
-			"sellerId":   "s1",
-			"total":      10.0,
+		payload := map[string]string{"name": "Alice Example", "email": email, "password": pass}
+		b, _ := json.Marshal(payload)
+		res, err := http.Post(baseURL+"/users/register", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("POST /users/register error: %v", err)
 		}
-		body, _ := json.Marshal(payload)
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/orders", bytes.NewReader(body))
+		if res.StatusCode != http.StatusCreated {
+			t.Fatalf("POST /users/register: expected 201, got %d", res.StatusCode)
+		}
+	}
+
+	// 1.2 Login
+	var loginResp struct{ Token string `json:"token"` }
+	{
+		payload := map[string]string{"email": email, "password": pass}
+		b, _ := json.Marshal(payload)
+		res, err := http.Post(baseURL+"/users/login", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("POST /users/login error: %v", err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("POST /users/login: expected 200, got %d", res.StatusCode)
+		}
+		mustDecode(t, res, &loginResp)
+		if loginResp.Token == "" {
+			t.Fatal("login: missing token")
+		}
+	}
+
+	// 1.3 Profile
+	{
+		req, _ := http.NewRequest("GET", baseURL+"/users/profile", nil)
+		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("GET /users/profile error: %v", err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /users/profile: expected 200, got %d", res.StatusCode)
+		}
+		var prof struct {
+			ID    string `json:"id"`
+			Name  string `json:"name"`
+			Email string `json:"email"`
+		}
+		mustDecode(t, res, &prof)
+		if prof.Email != email {
+			t.Fatalf("profile email=%q; want %q", prof.Email, email)
+		}
+	}
+}
+
+// =================================================================================
+// 2. Sellers
+// =================================================================================
+
+func TestSellers(t *testing.T) {
+	email := fmt.Sprintf("seller+%d@ex.com", time.Now().UnixNano())
+	pass := "hunter2!"
+
+	// 2.1 Register Seller
+	{
+		payload := map[string]string{
+			"name":     "Bob’s Burgers",
+			"email":    email,
+			"phone":    "+1-555-1234",
+			"password": pass,
+		}
+		b, _ := json.Marshal(payload)
+		res, err := http.Post(baseURL+"/sellers/register", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("POST /sellers/register error: %v", err)
+		}
+		if res.StatusCode != http.StatusCreated {
+			t.Fatalf("POST /sellers/register: expected 201, got %d", res.StatusCode)
+		}
+	}
+
+	// 2.1 Duplicate → 409
+	{
+		payload := map[string]string{"name": "Bob’s Burgers", "email": email, "phone": "+1-555-1234", "password": pass}
+		b, _ := json.Marshal(payload)
+		res, _ := http.Post(baseURL+"/sellers/register", "application/json", bytes.NewReader(b))
+		if res.StatusCode != http.StatusConflict {
+			t.Fatalf("POST /sellers/register duplicate: expected 409, got %d", res.StatusCode)
+		}
+	}
+
+	// 2.2 Seller Login
+	var loginResp struct{ Token string `json:"token"` }
+	{
+		payload := map[string]string{"email": email, "password": pass}
+		b, _ := json.Marshal(payload)
+		res, err := http.Post(baseURL+"/sellers/login", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("POST /sellers/login error: %v", err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("POST /sellers/login: expected 200, got %d", res.StatusCode)
+		}
+		mustDecode(t, res, &loginResp)
+		if loginResp.Token == "" {
+			t.Fatal("seller login: missing token")
+		}
+	}
+
+	// 2.4 List All Sellers
+	var sellers []struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Phone    string `json:"phone"`
+		Verified bool   `json:"verified"`
+	}
+	{
+		res, err := http.Get(baseURL + "/sellers")
+		if err != nil {
+			t.Fatalf("GET /sellers error: %v", err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /sellers: expected 200, got %d", res.StatusCode)
+		}
+		mustDecode(t, res, &sellers)
+		found := false
+		for _, s := range sellers {
+			if s.Email == email {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("GET /sellers did not include %s", email)
+		}
+	}
+
+	// 2.3 Get Seller by ID
+	{
+		var sellerID string
+		for _, s := range sellers {
+			if s.Email == email {
+				sellerID = s.ID
+			}
+		}
+		res, err := http.Get(baseURL + "/sellers/" + sellerID)
+		if err != nil {
+			t.Fatalf("GET /sellers/%s error: %v", sellerID, err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /sellers/%s: expected 200, got %d", sellerID, res.StatusCode)
+		}
+		var one struct {
+			ID       string `json:"id"`
+			Name     string `json:"name"`
+			Email    string `json:"email"`
+			Phone    string `json:"phone"`
+			Verified bool   `json:"verified"`
+		}
+		mustDecode(t, res, &one)
+		if one.ID == "" || one.Email != email {
+			t.Fatalf("GET /sellers/%s returned %+v", sellerID, one)
+		}
+	}
+}
+
+// =================================================================================
+// 3. Listings
+// =================================================================================
+
+func TestListings(t *testing.T) {
+	// Register a seller first
+	sellerEmail := fmt.Sprintf("lstsell+%d@ex.com", time.Now().UnixNano())
+	reg := map[string]string{"name": "ListSeller", "email": sellerEmail, "phone": "+1000", "password": "pw"}
+	b, _ := json.Marshal(reg)
+	http.Post(baseURL+"/sellers/register", "application/json", bytes.NewReader(b))
+
+	// Fetch sellerID
+	res, _ := http.Get(baseURL + "/sellers")
+	var sl []struct{ ID, Email string }
+	mustDecode(t, res, &sl)
+	var sellerID string
+	for _, x := range sl {
+		if x.Email == sellerEmail {
+			sellerID = x.ID
+		}
+	}
+
+	// 3.1 Create Listing
+	var createResp struct{ Message, ID string }
+	{
+		payload := map[string]interface{}{
+			"sellerId":    sellerID,
+			"title":       "Fresh Apples",
+			"description": "Crisp and sweet",
+			"price":       2.99,
+			"available":   true,
+		}
+		b, _ := json.Marshal(payload)
+		res, err := http.Post(baseURL+"/listings", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("POST /listings error: %v", err)
+		}
+		if res.StatusCode != http.StatusCreated {
+			t.Fatalf("POST /listings: expected 201, got %d", res.StatusCode)
+		}
+		mustDecode(t, res, &createResp)
+		if createResp.ID == "" {
+			t.Fatal("listing create: missing id")
+		}
+	}
+
+	// 3.2 Get Listing by ID
+	{
+		res, err := http.Get(baseURL + "/listings/" + createResp.ID)
+		if err != nil {
+			t.Fatalf("GET /listings/%s error: %v", createResp.ID, err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /listings/%s: expected 200, got %d", createResp.ID, res.StatusCode)
+		}
+	}
+
+	// 3.3 List all
+	{
+		res, err := http.Get(baseURL + "/listings")
+		if err != nil {
+			t.Fatalf("GET /listings error: %v", err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /listings: expected 200, got %d", res.StatusCode)
+		}
+	}
+
+	// 3.4 Update
+	{
+		update := map[string]interface{}{"price": 5.5, "available": false}
+		b, _ := json.Marshal(update)
+		req, _ := http.NewRequest("PUT", baseURL+"/listings/"+createResp.ID, bytes.NewReader(b))
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
-		r.ServeHTTP(w, req)
-		if w.Code != http.StatusCreated {
-			t.Fatalf("expected 201, got %d body %s", w.Code, w.Body.String())
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("PUT /listings/%s: %v", createResp.ID, err)
 		}
-
-		select {
-		case evt := <-bus:
-			if evt.Type != "OrderPlaced" {
-				t.Fatalf("expected OrderPlaced, got %s", evt.Type)
-			}
-		case <-time.After(time.Second):
-			t.Fatal("timeout waiting for OrderPlaced")
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("PUT /listings/%s: expected 200, got %d", createResp.ID, res.StatusCode)
 		}
 	}
 
-	// accept order
+	// 3.5 Delete
 	{
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPatch, "/orders/o1/accept", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		r.ServeHTTP(w, req)
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d", w.Code)
+		req, _ := http.NewRequest("DELETE", baseURL+"/listings/"+createResp.ID, nil)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("DELETE /listings/%s: %v", createResp.ID, err)
 		}
-
-		select {
-		case evt := <-bus:
-			if evt.Type != "OrderAccepted" {
-				t.Fatalf("expected OrderAccepted, got %s", evt.Type)
-			}
-		case <-time.After(time.Second):
-			t.Fatal("timeout waiting for OrderAccepted")
+		if res.StatusCode != http.StatusNoContent {
+			t.Fatalf("DELETE /listings/%s: expected 204, got %d", createResp.ID, res.StatusCode)
 		}
 	}
 }
 
-// -----------------------------------------------------------------------------
-// CONCURRENCY – Seller.Register race safety
-// -----------------------------------------------------------------------------
-func TestSeller_ConcurrentRegister(t *testing.T) {
-	svc := seller.NewInMemoryService()
-	const n = 10
-	var wg sync.WaitGroup
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			id := fmt.Sprintf("s-%d", i)
-			_ = svc.Register(seller.Seller{ID: id, Name: "X", Email: id + "@x.com"})
-		}(i)
+// =================================================================================
+// 4. Orders
+// =================================================================================
+
+func TestOrders(t *testing.T) {
+	// Register & login a user
+	email := fmt.Sprintf("orderusr+%d@ex.com", time.Now().UnixNano())
+	pass := "pw"
+	{
+		payload := map[string]string{"name": "OrderUser", "email": email, "password": pass}
+		b, _ := json.Marshal(payload)
+		http.Post(baseURL+"/users/register", "application/json", bytes.NewReader(b))
 	}
-	wg.Wait()
-	if got := len(svc.ListAll()); got != n {
-		t.Fatalf("expected %d sellers, got %d", n, got)
+	var loginResp struct{ Token string `json:"token"` }
+	{
+		payload := map[string]string{"email": email, "password": pass}
+		b, _ := json.Marshal(payload)
+		res, err := http.Post(baseURL+"/users/login", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("POST /users/login: %v", err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("POST /users/login: expected 200, got %d", res.StatusCode)
+		}
+		mustDecode(t, res, &loginResp)
+	}
+
+	// Seed seller & listing
+	sellerEmail := fmt.Sprintf("orderslr+%d@ex.com", time.Now().UnixNano())
+	{
+		payload := map[string]string{"name": "OrderSeller", "email": sellerEmail, "phone": "+3000", "password": "pw"}
+		b, _ := json.Marshal(payload)
+		http.Post(baseURL+"/sellers/register", "application/json", bytes.NewReader(b))
+	}
+	res, _ := http.Get(baseURL + "/sellers")
+	var sellers []struct{ ID, Email string }
+	mustDecode(t, res, &sellers)
+	var sid string
+	for _, s := range sellers {
+		if s.Email == sellerEmail {
+			sid = s.ID
+		}
+	}
+
+	// create listing for order
+	var lr struct{ ID string `json:"id"` }
+	{
+		payload := map[string]interface{}{
+			"sellerId":    sid,
+			"title":       "OrderItem",
+			"description": "d",
+			"price":       15.0,
+			"available":   true,
+		}
+		b, _ := json.Marshal(payload)
+		res, _ := http.Post(baseURL+"/listings", "application/json", bytes.NewReader(b))
+		mustDecode(t, res, &lr)
+	}
+
+	// 4.1 Create Order
+	var or struct {
+		ID         string   `json:"id"`
+		UserEmail  string   `json:"user_email"`
+		SellerID   string   `json:"sellerId"`
+		ListingIDs []string `json:"listingIds"`
+		Total      float64  `json:"total"`
+		CreatedAt  int64    `json:"createdAt"`
+		Status     string   `json:"status"`
+	}
+	{
+		payload := map[string]interface{}{
+			"listingIds": []string{lr.ID},
+			"sellerId":   sid,
+			"total":      15.0,
+		}
+		b, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("POST", baseURL+"/orders", bytes.NewReader(b))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("POST /orders: %v", err)
+		}
+		if res.StatusCode != http.StatusCreated {
+			t.Fatalf("POST /orders: expected 201, got %d", res.StatusCode)
+		}
+		mustDecode(t, res, &or)
+		if or.Status != "pending" {
+			t.Fatalf("new order status=%q; want pending", or.Status)
+		}
+	}
+
+	// 4.3 List My Orders
+	{
+		req, _ := http.NewRequest("GET", baseURL+"/orders", nil)
+		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		res, _ := http.DefaultClient.Do(req)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /orders: expected 200, got %d", res.StatusCode)
+		}
+		var list []struct{ ID, Status string }
+		mustDecode(t, res, &list)
+		found := false
+		for _, x := range list {
+			if x.ID == or.ID {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("GET /orders missing %s", or.ID)
+		}
+	}
+
+	// 4.4 Accept Order
+	{
+		req, _ := http.NewRequest("PATCH", baseURL+"/orders/"+or.ID+"/accept", nil)
+		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		res, _ := http.DefaultClient.Do(req)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("PATCH /orders/%s/accept: expected 200, got %d", or.ID, res.StatusCode)
+		}
+	}
+
+	// 4.2 Get Order by ID
+	{
+		req, _ := http.NewRequest("GET", baseURL+"/orders/"+or.ID, nil)
+		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		res, _ := http.DefaultClient.Do(req)
+		mustDecode(t, res, &or)
+		if or.Status != "accepted" {
+			t.Fatalf("order status after accept=%q; want accepted", or.Status)
+		}
+	}
+
+	// 4.5 Complete Order
+	{
+		req, _ := http.NewRequest("PATCH", baseURL+"/orders/"+or.ID+"/complete", nil)
+		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		res, _ := http.DefaultClient.Do(req)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("PATCH /orders/%s/complete: expected 200, got %d", or.ID, res.StatusCode)
+		}
+	}
+
+	// Final GET
+	{
+		req, _ := http.NewRequest("GET", baseURL+"/orders/"+or.ID, nil)
+		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		res, _ := http.DefaultClient.Do(req)
+		mustDecode(t, res, &or)
+		if or.Status != "completed" {
+			t.Fatalf("order status after complete=%q; want completed", or.Status)
+		}
 	}
 }
