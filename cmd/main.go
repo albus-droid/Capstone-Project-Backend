@@ -9,9 +9,6 @@ import (
 	"github.com/albus-droid/Capstone-Project-Backend/internal/user"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/db"
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"log"
 )
 
 func main() {
