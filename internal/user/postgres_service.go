@@ -5,6 +5,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"github.com/google/uuid"
 )
 
 type postgresService struct {
@@ -24,6 +25,7 @@ func (s *postgresService) Register(u User) error {
 		return err
 	}
 
+	u.ID = uuid.NewString()
 	// Hash the password
 	h, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
