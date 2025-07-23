@@ -34,8 +34,10 @@ func (s *postgresService) Create(o Order) error {
         return err
     }
     // emit event
-    go event.Bus <- event.Event{Type: "OrderPlaced", Data: o}
-    return nil
+    go func(ev Event) {
+       event.Bus <- ev
+   }(event.Event{Type: "OrderPlaced", Data: o})    
+   return nil
 }
 
 func (s *postgresService) GetByID(id string) (*Order, error) {
@@ -84,6 +86,8 @@ func (s *postgresService) updateStatus(id, callerEmail, newStatus, eventType str
     }
     o.Status = newStatus
     // emit event
-    go event.Bus <- event.Event{Type: eventType, Data: o}
+    go func(ev Event) {
+       event.Bus <- ev
+    }(event.Event{Type: eventType, Data: o})
     return nil
 }
