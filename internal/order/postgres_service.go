@@ -18,26 +18,23 @@ func NewPostgresService(db *gorm.DB) Service {
     return &postgresService{db: db}
 }
 
-func (s *postgresService) Create(o Order) error {
-    // Check for duplicate ID
-    if err := s.db.First(&Order{}, "id = ?", o.ID).Error; err == nil {
-        return errors.New("order already exists")
-    } else if !errors.Is(err, gorm.ErrRecordNotFound) {
-        return err
-    }
-
-    // Assign ID and timestamp
+func (s *postgresService) Create(o *Order) error {
+    // 1) assign a fresh ID & timestamp
     o.ID = uuid.NewString()
     o.CreatedAt = time.Now().Unix()
+    o.Status = "pending"      // if not already set
 
-    if err := s.db.Create(&o).Error; err != nil {
+    // 2) insert—UUID collisions are practically impossible, so no pre‑check needed
+    if err := s.db.Create(o).Error; err != nil {
         return err
     }
-    // emit event
-    go func(ev event.Event) {
-       event.Bus <- ev
-   }(event.Event{Type: "OrderPlaced", Data: o})    
-   return nil
+
+    // 3) emit the OrderPlaced event
+    go func(placed Order) {
+        event.Bus <- event.Event{Type: "OrderPlaced", Data: placed}
+    }(*o)
+
+    return nil
 }
 
 func (s *postgresService) GetByID(id string) (*Order, error) {

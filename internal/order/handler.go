@@ -17,7 +17,6 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 	// ─────────────────────────────────────────────────────────────
 	grp.POST("", func(c *gin.Context) {
 		var payload struct {
-			ID         string   `json:"id"`         // 👈 client-supplied ID
 			ListingIDs []string `json:"listingIds"`
 			SellerID   string   `json:"sellerId"`
 			Total      float64  `json:"total"`
@@ -29,7 +28,6 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 
 		email := c.GetString(string(auth.CtxEmailKey))
 		o := Order{
-			ID:         payload.ID,      // 👈 store it
 			UserEmail:  email,
 			SellerID:   payload.SellerID,
 			ListingIDs: payload.ListingIDs,

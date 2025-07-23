@@ -1,7 +1,7 @@
 // internal/order/service.go
 package order
 type Service interface {
-    Create(o Order) error
+    Create(o *Order) error
     GetByID(id string) (*Order, error)
     ListByUser(email string) ([]Order, error)
 
