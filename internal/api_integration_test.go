@@ -208,96 +208,143 @@ func TestSellers(t *testing.T) {
 // =================================================================================
 
 func TestListings(t *testing.T) {
-	// Register a seller first
-	sellerEmail := fmt.Sprintf("lstsell+%d@ex.com", time.Now().UnixNano())
-	reg := map[string]string{"name": "ListSeller", "email": sellerEmail, "phone": "+1000", "password": "pw"}
-	b, _ := json.Marshal(reg)
-	http.Post(baseURL+"/sellers/register", "application/json", bytes.NewReader(b))
+    // 1) Register a seller
+    sellerEmail := fmt.Sprintf("lstsell+%d@ex.com", time.Now().UnixNano())
+    reg := map[string]string{
+        "name":     "ListSeller",
+        "email":    sellerEmail,
+        "phone":    "+1000",
+        "password": "pw",
+    }
+    b, _ := json.Marshal(reg)
+    res, err := http.Post(baseURL+"/sellers/register", "application/json", bytes.NewReader(b))
+    if err != nil || res.StatusCode != http.StatusCreated {
+        t.Fatalf("POST /sellers/register failed: %v / %d", err, res.StatusCode)
+    }
 
-	// Fetch sellerID
-	res, _ := http.Get(baseURL + "/sellers")
-	var sl []struct{ ID, Email string }
-	mustDecode(t, res, &sl)
-	var sellerID string
-	for _, x := range sl {
-		if x.Email == sellerEmail {
-			sellerID = x.ID
-		}
-	}
+    // 2) Log in to get a token
+    var loginResp struct{ Token string `json:"token"` }
+    {
+        creds := map[string]string{"email": sellerEmail, "password": "pw"}
+        b, _ := json.Marshal(creds)
+        res, err := http.Post(baseURL+"/sellers/login", "application/json", bytes.NewReader(b))
+        if err != nil {
+            t.Fatalf("POST /sellers/login failed: %v", err)
+        }
+        if res.StatusCode != http.StatusOK {
+            t.Fatalf("POST /sellers/login: expected 200, got %d", res.StatusCode)
+        }
+        mustDecode(t, res, &loginResp)
+        if loginResp.Token == "" {
+            t.Fatal("seller login: missing token")
+        }
+    }
+    authHeader := "Bearer " + loginResp.Token
 
-	// 3.1 Create Listing
-	var createResp struct{ Message, ID string }
-	{
-		payload := map[string]interface{}{
-			"sellerId":    sellerID,
-			"title":       "Fresh Apples",
-			"description": "Crisp and sweet",
-			"price":       2.99,
-			"available":   true,
-		}
-		b, _ := json.Marshal(payload)
-		res, err := http.Post(baseURL+"/listings", "application/json", bytes.NewReader(b))
-		if err != nil {
-			t.Fatalf("POST /listings error: %v", err)
-		}
-		if res.StatusCode != http.StatusCreated {
-			t.Fatalf("POST /listings: expected 201, got %d", res.StatusCode)
-		}
-		mustDecode(t, res, &createResp)
-		if createResp.ID == "" {
-			t.Fatal("listing create: missing id")
-		}
-	}
+    // 3) Fetch the seller’s ID
+    res, err = http.Get(baseURL + "/sellers")
+    if err != nil {
+        t.Fatalf("GET /sellers: %v", err)
+    }
+    var sellers []struct{ ID, Email string }
+    mustDecode(t, res, &sellers)
+    var sellerID string
+    for _, s := range sellers {
+        if s.Email == sellerEmail {
+            sellerID = s.ID
+            break
+        }
+    }
+    if sellerID == "" {
+        t.Fatal("could not find new seller in /sellers")
+    }
 
-	// 3.2 Get Listing by ID
-	{
-		res, err := http.Get(baseURL + "/listings/" + createResp.ID)
-		if err != nil {
-			t.Fatalf("GET /listings/%s error: %v", createResp.ID, err)
-		}
-		if res.StatusCode != http.StatusOK {
-			t.Fatalf("GET /listings/%s: expected 200, got %d", createResp.ID, res.StatusCode)
-		}
-	}
+    // 4) POST /listings
+    var createResp struct{ Message, ID string }
+    {
+        payload := map[string]interface{}{
+            "sellerId":    sellerID,
+            "title":       "Fresh Apples",
+            "description": "Crisp and sweet",
+            "price":       2.99,
+            "available":   true,
+        }
+        b, _ := json.Marshal(payload)
+        req, _ := http.NewRequest("POST", baseURL+"/listings", bytes.NewReader(b))
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("Authorization", authHeader)
+        res, err := http.DefaultClient.Do(req)
+        if err != nil {
+            t.Fatalf("POST /listings: %v", err)
+        }
+        if res.StatusCode != http.StatusCreated {
+            t.Fatalf("POST /listings: expected 201, got %d", res.StatusCode)
+        }
+        mustDecode(t, res, &createResp)
+        if createResp.ID == "" {
+            t.Fatal("listing create: missing id")
+        }
+    }
 
-	// 3.3 List all
-	{
-		res, err := http.Get(baseURL + "/listings")
-		if err != nil {
-			t.Fatalf("GET /listings error: %v", err)
-		}
-		if res.StatusCode != http.StatusOK {
-			t.Fatalf("GET /listings: expected 200, got %d", res.StatusCode)
-		}
-	}
+    // 5) GET /listings/:id
+    {
+        url := fmt.Sprintf("%s/listings/%s", baseURL, createResp.ID)
+        req, _ := http.NewRequest("GET", url, nil)
+        req.Header.Set("Authorization", authHeader)
+        res, err := http.DefaultClient.Do(req)
+        if err != nil {
+            t.Fatalf("GET /listings/%s: %v", createResp.ID, err)
+        }
+        if res.StatusCode != http.StatusOK {
+            t.Fatalf("GET /listings/%s: expected 200, got %d", createResp.ID, res.StatusCode)
+        }
+    }
 
-	// 3.4 Update
-	{
-		update := map[string]interface{}{"price": 5.5, "available": false}
-		b, _ := json.Marshal(update)
-		req, _ := http.NewRequest("PUT", baseURL+"/listings/"+createResp.ID, bytes.NewReader(b))
-		req.Header.Set("Content-Type", "application/json")
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatalf("PUT /listings/%s: %v", createResp.ID, err)
-		}
-		if res.StatusCode != http.StatusOK {
-			t.Fatalf("PUT /listings/%s: expected 200, got %d", createResp.ID, res.StatusCode)
-		}
-	}
+    // 6) GET /listings (all)
+    {
+        req, _ := http.NewRequest("GET", baseURL+"/listings", nil)
+        req.Header.Set("Authorization", authHeader)
+        res, err := http.DefaultClient.Do(req)
+        if err != nil {
+            t.Fatalf("GET /listings: %v", err)
+        }
+        if res.StatusCode != http.StatusOK {
+            t.Fatalf("GET /listings: expected 200, got %d", res.StatusCode)
+        }
+    }
 
-	// 3.5 Delete
-	{
-		req, _ := http.NewRequest("DELETE", baseURL+"/listings/"+createResp.ID, nil)
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatalf("DELETE /listings/%s: %v", createResp.ID, err)
-		}
-		if res.StatusCode != http.StatusNoContent {
-			t.Fatalf("DELETE /listings/%s: expected 204, got %d", createResp.ID, res.StatusCode)
-		}
-	}
+    // 7) PUT /listings/:id
+    {
+        update := map[string]interface{}{"price": 5.5, "available": false}
+        b, _ := json.Marshal(update)
+        url := fmt.Sprintf("%s/listings/%s", baseURL, createResp.ID)
+        req, _ := http.NewRequest("PUT", url, bytes.NewReader(b))
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("Authorization", authHeader)
+        res, err := http.DefaultClient.Do(req)
+        if err != nil {
+            t.Fatalf("PUT /listings/%s: %v", createResp.ID, err)
+        }
+        if res.StatusCode != http.StatusOK {
+            t.Fatalf("PUT /listings/%s: expected 200, got %d", createResp.ID, res.StatusCode)
+        }
+    }
+
+    // 8) DELETE /listings/:id
+    {
+        url := fmt.Sprintf("%s/listings/%s", baseURL, createResp.ID)
+        req, _ := http.NewRequest("DELETE", url, nil)
+        req.Header.Set("Authorization", authHeader)
+        res, err := http.DefaultClient.Do(req)
+        if err != nil {
+            t.Fatalf("DELETE /listings/%s: %v", createResp.ID, err)
+        }
+        if res.StatusCode != http.StatusNoContent {
+            t.Fatalf("DELETE /listings/%s: expected 204, got %d", createResp.ID, res.StatusCode)
+        }
+    }
 }
+
 
 // =================================================================================
 // 4. Orders

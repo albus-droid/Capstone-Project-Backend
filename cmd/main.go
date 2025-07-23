@@ -8,22 +8,25 @@ import (
 	"github.com/albus-droid/Capstone-Project-Backend/internal/seller"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/user"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/db"
+	"github.com/albus-droid/Capstone-Project-Backend/internal/auth"
+
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	r := gin.Default()
 	db := db.Init()
+	redisStore := auth.NewRedisStore("redis:6379", "", 0)
 
 	// user routes
 	user.Migrate(db) // optional for dev
 	usvc := user.NewPostgresService(db)
-	user.RegisterRoutes(r, usvc)
+	user.RegisterRoutes(r, usvc, redisStore)
 
 	// seller routes
 	seller.Migrate(db) // optional for dev
 	ssvc := seller.NewPostgresService(db)
-	seller.RegisterRoutes(r, ssvc)
+	seller.RegisterRoutes(r, ssvc, redisStore)
 
 	// Listing routes
 	listing.Migrate(db) // optional for dev
