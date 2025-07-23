@@ -16,7 +16,7 @@ var baseURL = func() string {
 	if u := os.Getenv("API_BASE_URL"); u != "" {
 		return u
 	}
-	return "http://localhost:8080"
+	return "http://localhost:8000"
 }()
 
 func TestUserRegisterLoginProfile(t *testing.T) {
