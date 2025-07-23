@@ -7,7 +7,6 @@ package internal_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -43,8 +42,13 @@ func generateTestToken(email string) string {
 	return s
 }
 
-// newRouter spins up Gin with GORM+SQLite services
-func newRouter() *gin.Engine {
+// newRouter spins up Gin with GORM+SQLite services and returns the router plus the services
+func newRouter() (*gin.Engine, struct {
+	usvc user.Service
+	ssvc seller.Service
+	lsvc listing.Service
+	osvc order.Service
+}) {
 	gin.SetMode(gin.TestMode)
 
 	// open in‑memory SQLite
@@ -67,24 +71,31 @@ func newRouter() *gin.Engine {
 	}
 
 	// wire services
-	usvc := user.NewPostgresService(db)
-	ssvc := seller.NewPostgresService(db)
-	lsvc := listing.NewPostgresService(db)
-	osvc := order.NewPostgresService(db)
+	svcs := struct {
+		usvc user.Service
+		ssvc seller.Service
+		lsvc listing.Service
+		osvc order.Service
+	}{
+		usvc: user.NewPostgresService(db),
+		ssvc: seller.NewPostgresService(db),
+		lsvc: listing.NewPostgresService(db),
+		osvc: order.NewPostgresService(db),
+	}
 
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	user.RegisterRoutes(r, usvc)
-	seller.RegisterRoutes(r, ssvc)
-	listing.RegisterRoutes(r, lsvc)
-	order.RegisterRoutes(r, osvc)
+	user.RegisterRoutes(r, svcs.usvc)
+	seller.RegisterRoutes(r, svcs.ssvc)
+	listing.RegisterRoutes(r, svcs.lsvc)
+	order.RegisterRoutes(r, svcs.osvc)
 
-	return r
+	return r, svcs
 }
 
 func TestUserEndpoints(t *testing.T) {
-	r := newRouter()
+	r, _ := newRouter()
 
 	// 1. Register
 	reg := map[string]string{
@@ -129,7 +140,7 @@ func TestUserEndpoints(t *testing.T) {
 }
 
 func TestSellerEndpoints(t *testing.T) {
-	r := newRouter()
+	r, _ := newRouter()
 
 	// Register
 	sellerPayload := map[string]string{
@@ -166,9 +177,6 @@ func TestSellerEndpoints(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("Seller login: got %d", w.Code)
 	}
-	var tok map[string]string
-	json.Unmarshal(w.Body.Bytes(), &tok)
-	sellerToken := tok["token"]
 
 	// List all
 	w = httptest.NewRecorder()
@@ -180,7 +188,7 @@ func TestSellerEndpoints(t *testing.T) {
 }
 
 func TestListingEndpoints(t *testing.T) {
-	r := newRouter()
+	r, _ := newRouter()
 
 	// create a seller first
 	_ = httptest.NewRecorder()
@@ -256,18 +264,17 @@ func TestOrderEndpoints(t *testing.T) {
 	bus := make(chan event.Event, 2)
 	event.Bus = bus
 
-	r := newRouter()
+	r, svcs := newRouter()
 
 	// seed seller & listing
-	_ = user.NewPostgresService(nil) // no-op for order flow
-	_ = seller.NewPostgresService(nil)
-	_ = listing.NewPostgresService(nil)
-	// register a user & get token
-	usvc := user.NewPostgresService(nil)
-	usvc.Register(user.User{Name: "A", Email: "a@ex.com", Password: "pw"})
-	token := generateTestToken("a@ex.com")
+	_ = svcs.ssvc.Register(seller.Seller{ID: "s1", Name: "Bob", Email: "bob@ex.com", Phone: "000", Password: "pw"})
+	_ = svcs.lsvc.Create(listing.Listing{ID: "l1", SellerID: "s1", Title: "Prod", Price: 10.0})
 
-	// create
+	// register a user & get token
+	_ = svcs.usvc.Register(user.User{ID: "u1", Name: "Alice", Email: "alice@ex.com", Password: "pw"})
+	token := generateTestToken("alice@ex.com")
+
+	// create order
 	payload := map[string]any{
 		"listingIds": []string{"l1"},
 		"sellerId":   "s1",
@@ -284,18 +291,20 @@ func TestOrderEndpoints(t *testing.T) {
 	}
 
 	// receive OrderPlaced
+	var placed event.Event
 	select {
-	case ev := <-bus:
-		if ev.Type != "OrderPlaced" {
-			t.Fatalf("expected OrderPlaced, got %s", ev.Type)
+	case placed = <-bus:
+		if placed.Type != "OrderPlaced" {
+			t.Fatalf("expected OrderPlaced, got %s", placed.Type)
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("timeout waiting for OrderPlaced")
 	}
 
-	// accept
+	// accept order
+	orderID := placed.Data.(order.Order).ID
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("PATCH", "/orders/"+ev.Data.(order.Order).ID+"/accept", nil)
+	req = httptest.NewRequest("PATCH", "/orders/"+orderID+"/accept", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
