@@ -7,13 +7,20 @@ import (
 	"github.com/albus-droid/Capstone-Project-Backend/internal/order"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/seller"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/user"
+	"github.com/albus-droid/Capstone-Project-Backend/internal/db"
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"log"
 )
 
 func main() {
 	r := gin.Default()
+	db := db.Init()
+
 	// user routes
-	usvc := user.NewInMemoryService()
+	user.Migrate(db) // optional for dev
+	usvc := user.NewPostgresService(db)
 	user.RegisterRoutes(r, usvc)
 
 	// seller routes
