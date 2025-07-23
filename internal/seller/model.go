@@ -1,5 +1,11 @@
 package seller
 
+import (
+    "time"
+
+    "gorm.io/gorm"
+)
+
 type Seller struct {
     ID        uuid.UUID      `json:"id" gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
     Name      string         `json:"name" gorm:"type:varchar(100);not null"`

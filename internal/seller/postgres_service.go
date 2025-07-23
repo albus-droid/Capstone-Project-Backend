@@ -31,7 +31,7 @@ func (s *postgresService) Register(sl Seller) error {
     }
 
     // assign UUID & hash pw
-    sl.ID = uuid.New().String()
+    sl.ID = uuid.NewString()	
     h, err := bcrypt.GenerateFromPassword([]byte(sl.Password), bcrypt.DefaultCost)
     if err != nil {
         return err
