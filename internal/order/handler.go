@@ -2,10 +2,15 @@ package order
 
 import (
 	"net/http"
-
+	"log"
+	"encoding/json"
+	"errors"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/auth"
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
 )
+
+var ErrOrderAlreadyExists = errors.New("order already exists")
 
 func RegisterRoutes(r *gin.Engine, svc Service) {
 	grp := r.Group("/orders")
@@ -24,19 +29,25 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
+		raw, _ := json.Marshal(payload.ListingIDs)
 		email := c.GetString(string(auth.CtxEmailKey))
 		o := &Order{
 			UserEmail:  email,
 			SellerID:   payload.SellerID,
-			ListingIDs: payload.ListingIDs,
+			ListingIDs: datatypes.JSON(raw),
 			Total:      payload.Total,
 		}
 		if err := svc.Create(o); err != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusCreated, o) // return the order (or a message if you prefer)
+    		switch {
+    		case errors.Is(err, ErrOrderAlreadyExists):
+        		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+    		default:
+        		log.Printf("create order failed: %v", err)
+        		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+    		}
+    		return
+    	}
+    	c.JSON(http.StatusCreated, o) // return the order (or a message if you prefer)
 	})
 
 	// ─────────────────────────────────────────────────────────────
