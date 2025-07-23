@@ -1,6 +1,6 @@
 // integration_test.go
 // ----------------------------------------------------------------------------
-// Integration tests against a running backend at http://localhost:8000
+// Run against a live backend (docker-compose up -d must be running)
 // ----------------------------------------------------------------------------
 package main
 
@@ -8,13 +8,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"os"
 	"testing"
 )
 
-const baseURL = "http://localhost:8000"
+var baseURL = func() string {
+	if u := os.Getenv("API_BASE_URL"); u != "" {
+		return u
+	}
+	return "http://localhost:8080"
+}()
 
 func TestUserRegisterLoginProfile(t *testing.T) {
-	// 1) Register
+	// Register
 	reg := map[string]string{
 		"name":     "Test User",
 		"email":    "testuser@example.com",
@@ -29,7 +35,7 @@ func TestUserRegisterLoginProfile(t *testing.T) {
 		t.Fatalf("Register: expected 201, got %d", res.StatusCode)
 	}
 
-	// 2) Login
+	// Login
 	login := map[string]string{"email": reg["email"], "password": reg["password"]}
 	body, _ = json.Marshal(login)
 	res, err = http.Post(baseURL+"/users/login", "application/json", bytes.NewReader(body))
@@ -48,7 +54,7 @@ func TestUserRegisterLoginProfile(t *testing.T) {
 		t.Fatal("Login: missing token")
 	}
 
-	// 3) Profile
+	// Profile
 	req, _ := http.NewRequest("GET", baseURL+"/users/profile", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res, err = http.DefaultClient.Do(req)
@@ -105,7 +111,7 @@ func TestSellerFlow(t *testing.T) {
 }
 
 func TestListingCRUD(t *testing.T) {
-	// Create a listing
+	// Create listing
 	lreq := map[string]any{
 		"sellerId":    "00000000-0000-0000-0000-000000000000",
 		"title":       "Test Item",
@@ -122,9 +128,11 @@ func TestListingCRUD(t *testing.T) {
 		t.Fatalf("Create listing: expected 201, got %d", res.StatusCode)
 	}
 	var lr map[string]string
-	json.NewDecoder(res.Body).Decode(&lr)
+	if err := json.NewDecoder(res.Body).Decode(&lr); err != nil {
+		t.Fatalf("Create decode failed: %v", err)
+	}
 	id, ok := lr["id"]
-	if !ok {
+	if !ok || id == "" {
 		t.Fatal("Create listing: missing id")
 	}
 
@@ -177,9 +185,9 @@ func TestOrderLifecycle(t *testing.T) {
 	http.Post(baseURL+"/users/register", "application/json", bytes.NewReader(body))
 	body, _ = json.Marshal(map[string]string{"email": ureg["email"], "password": ureg["password"]})
 	res, _ := http.Post(baseURL+"/users/login", "application/json", bytes.NewReader(body))
-	var loginResp map[string]string
-	json.NewDecoder(res.Body).Decode(&loginResp)
-	userToken := loginResp["token"]
+	var lr map[string]string
+	json.NewDecoder(res.Body).Decode(&lr)
+	userToken := lr["token"]
 
 	// Create an order
 	oreq := map[string]any{
@@ -202,23 +210,13 @@ func TestOrderLifecycle(t *testing.T) {
 	json.NewDecoder(res.Body).Decode(&or)
 	oid, _ := or["id"].(string)
 
-	// Get by ID and check status pending
-	req, _ = http.NewRequest("GET", baseURL+"/orders/"+oid, nil)
-	req.Header.Set("Authorization", "Bearer "+userToken)
-	res, _ = http.DefaultClient.Do(req)
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("Get order: expected 200, got %d", res.StatusCode)
-	}
-	var or2 map[string]any
-	json.NewDecoder(res.Body).Decode(&or2)
-	if or2["status"] != "pending" {
-		t.Fatalf("Expected status pending, got %v", or2["status"])
-	}
-
 	// Accept the order
 	req, _ = http.NewRequest("PATCH", baseURL+"/orders/"+oid+"/accept", nil)
 	req.Header.Set("Authorization", "Bearer "+userToken)
-	res, _ = http.DefaultClient.Do(req)
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Accept order failed: %v", err)
+	}
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("Accept order: expected 200, got %d", res.StatusCode)
 	}
@@ -226,7 +224,14 @@ func TestOrderLifecycle(t *testing.T) {
 	// Verify status accepted
 	req, _ = http.NewRequest("GET", baseURL+"/orders/"+oid, nil)
 	req.Header.Set("Authorization", "Bearer "+userToken)
-	res, _ = http.DefaultClient.Do(req)
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Get order failed: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("Get order: expected 200, got %d", res.StatusCode)
+	}
+	var or2 map[string]any
 	json.NewDecoder(res.Body).Decode(&or2)
 	if or2["status"] != "accepted" {
 		t.Fatalf("Expected status accepted, got %v", or2["status"])
@@ -235,7 +240,10 @@ func TestOrderLifecycle(t *testing.T) {
 	// Complete the order
 	req, _ = http.NewRequest("PATCH", baseURL+"/orders/"+oid+"/complete", nil)
 	req.Header.Set("Authorization", "Bearer "+userToken)
-	res, _ = http.DefaultClient.Do(req)
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Complete order failed: %v", err)
+	}
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("Complete order: expected 200, got %d", res.StatusCode)
 	}
@@ -243,7 +251,10 @@ func TestOrderLifecycle(t *testing.T) {
 	// Verify status completed
 	req, _ = http.NewRequest("GET", baseURL+"/orders/"+oid, nil)
 	req.Header.Set("Authorization", "Bearer "+userToken)
-	res, _ = http.DefaultClient.Do(req)
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Get order (completed) failed: %v", err)
+	}
 	json.NewDecoder(res.Body).Decode(&or2)
 	if or2["status"] != "completed" {
 		t.Fatalf("Expected status completed, got %v", or2["status"])

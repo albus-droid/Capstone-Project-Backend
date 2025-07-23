@@ -25,4 +25,4 @@ jobs:
       run: docker compose up --build -d
 
     - name: Test
-      run: go test -v ./internal
+      run: go test -timeout 30s -v ./internal
