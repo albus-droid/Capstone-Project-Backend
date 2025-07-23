@@ -2,7 +2,6 @@ package order
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/albus-droid/Capstone-Project-Backend/internal/auth"
 	"github.com/gin-gonic/gin"
