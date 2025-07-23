@@ -36,7 +36,7 @@ func main() {
 	order.RegisterRoutes(r, osvc)
 
 	startNotificationListener()
-	r.Run(":8080") // http://localhost:8080
+	r.Run(":8000") // http://localhost:8080
 }
 
 func startNotificationListener() {
