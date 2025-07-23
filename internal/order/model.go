@@ -9,7 +9,7 @@ import (
 // gorm.Model is not embedded so we control fields explicitly
 type Order struct {
     ID         string         `json:"id" gorm:"type:uuid;primaryKey"`
-    UserID     string         `json:"userId" gorm:"type:uuid;not null;index"`
+    // UserID     string         `json:"userId" gorm:"type:uuid;not null;index"`
     UserEmail  string         `json:"user_email" gorm:"type:varchar(100);not null;index"`
     SellerID   string         `json:"sellerId" gorm:"type:uuid;not null;index"`
     ListingIDs []string       `json:"listingIds" gorm:"type:jsonb;not null;default:'[]'"`

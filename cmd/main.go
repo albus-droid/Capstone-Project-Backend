@@ -50,7 +50,7 @@ func startNotificationListener() {
 
 			case "OrderAccepted":
 				order := e.Data.(order.Order)
-				fmt.Printf("📬 Notify user %s that order %s was accepted\n", order.UserID, order.ID)
+				fmt.Printf("📬 Notify user %s that order %s was accepted\n", order.UserEmail, order.ID)
 			}
 		}
 	}()
