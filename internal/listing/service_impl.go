@@ -2,71 +2,64 @@ package listing
 
 import (
     "errors"
+    "sort"
+
     "github.com/google/uuid"
+    "gorm.io/gorm"
 )
 
-type inMemoryService struct {
-    items map[string]Listing
+// postgresService persists listings in Postgres via GORM.
+type postgresService struct {
+    db *gorm.DB
 }
 
-func NewInMemoryService() Service {
-    return &inMemoryService{
-        items: make(map[string]Listing),
-    }
+// NewPostgresService returns a Listing Service backed by Postgres.
+func NewPostgresService(db *gorm.DB) Service {
+    return &postgresService{db}
 }
 
-func (s *inMemoryService) Create(l Listing) error {
-
-    l.ID = uuid.New().String()
-
-    if _, exists := s.items[l.ID]; exists {
-        return errors.New("listing already exists")
-    }
-    s.items[l.ID] = l
-    return nil
+func (s *postgresService) Create(l Listing) error {
+    l.ID = uuid.NewString()
+    return s.db.Create(&l).Error
 }
 
-func (s *inMemoryService) GetByID(id string) (*Listing, error) {
-    l, ok := s.items[id]
-    if !ok {
-        return nil, errors.New("listing not found")
+func (s *postgresService) GetByID(id string) (*Listing, error) {
+    var l Listing
+    if err := s.db.First(&l, "id = ?", id).Error; err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, errors.New("listing not found")
+        }
+        return nil, err
     }
     return &l, nil
 }
 
-func (s *inMemoryService) ListBySeller(sellerID string) ([]Listing, error) {
-    var result []Listing
-    for _, l := range s.items {
-        if l.SellerID == sellerID {
-            result = append(result, l)
-        }
+func (s *postgresService) ListBySeller(sellerID string) ([]Listing, error) {
+    var out []Listing
+    if err := s.db.Where("seller_id = ?", sellerID).Find(&out).Error; err != nil {
+        return nil, err
     }
-    return result, nil
+    sort.Slice(out, func(i, j int) bool {
+        return out[i].CreatedAt.Before(out[j].CreatedAt)
+    })
+    return out, nil
 }
 
-func (s *inMemoryService) ListAll() []Listing {
+// If you need a ListAll (not in your in‑memory), you can add:
+func (s *postgresService) ListAll() []Listing {
     var all []Listing
-    for _, l := range s.items {
-        all = append(all, l)
-    }
+    s.db.Find(&all)
+    sort.Slice(all, func(i, j int) bool {
+        return all[i].CreatedAt.Before(all[j].CreatedAt)
+    })
     return all
 }
 
-func (s *inMemoryService) Update(id string, l Listing) error {
-    if _, ok := s.items[id]; !ok {
-        return errors.New("listing not found")
-    }
-    // ensure the ID stays the same
+func (s *postgresService) Update(id string, l Listing) error {
     l.ID = id
-    s.items[id] = l
-    return nil
+    return s.db.Save(&l).Error
 }
 
-func (s *inMemoryService) Delete(id string) error {
-    if _, ok := s.items[id]; !ok {
-        return errors.New("listing not found")
-    }
-    delete(s.items, id)
-    return nil
+func (s *postgresService) Delete(id string) error {
+    return s.db.Delete(&Listing{}, "id = ?", id).Error
 }
-
