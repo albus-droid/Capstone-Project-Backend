@@ -32,8 +32,6 @@ func RegisterRoutes(r *gin.Engine, svc Service) {
 			SellerID:   payload.SellerID,
 			ListingIDs: payload.ListingIDs,
 			Total:      payload.Total,
-			Status:     "pending",
-			CreatedAt:  time.Now().Unix(),
 		}
 		if err := svc.Create(&o); err != nil {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
