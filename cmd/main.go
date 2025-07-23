@@ -26,12 +26,12 @@ func main() {
 	seller.RegisterRoutes(r, ssvc)
 
 	// Listing routes
-	listing.Migrate(db) // optional for dev
-	lsvc := listing.NewPostgresService(db)
+	lsvc := listing.NewInMemoryService()
 	listing.RegisterRoutes(r, lsvc)
 
 	// Order
-	osvc := order.NewInMemoryService()
+	order.Migrate(db) // optional for dev
+	osvc := order.NewPostgresService(db)
 	order.RegisterRoutes(r, osvc)
 
 	startNotificationListener()
