@@ -28,7 +28,7 @@ func (s *postgresService) Create(o Order) error {
 
     // Assign ID and timestamp
     o.ID = uuid.NewString()
-    o.CreatedAt = time.Now()
+    o.CreatedAt = time.Now().Unix()
 
     if err := s.db.Create(&o).Error; err != nil {
         return err
@@ -57,7 +57,9 @@ func (s *postgresService) ListByUser(userEmail string) ([]Order, error) {
         return nil, err
     }
     // keep same ordering as in-memory
-    sort.Slice(list, func(i, j int) bool { return list[i].CreatedAt.Before(list[j].CreatedAt) })
+    sort.Slice(list, func(i, j int) bool {
+        return list[i].CreatedAt < list[j].CreatedAt
+    })
     return list, nil
 }
 
