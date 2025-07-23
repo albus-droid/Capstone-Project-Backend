@@ -18,9 +18,9 @@ func NewPostgresService(db *gorm.DB) Service {
     return &postgresService{db}
 }
 
-func (s *postgresService) Create(l Listing) error {
+func (s *postgresService) Create(l *Listing) error {
     l.ID = uuid.NewString()
-    return s.db.Create(&l).Error
+    return s.db.Create(l).Error
 }
 
 func (s *postgresService) GetByID(id string) (*Listing, error) {

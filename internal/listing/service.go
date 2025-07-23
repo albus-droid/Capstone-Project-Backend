@@ -2,7 +2,7 @@ package listing
 
 // Service defines what our handlers expect.
 type Service interface {
-    Create(l Listing) error
+    Create(l *Listing) error
     GetByID(id string) (*Listing, error)
     ListBySeller(sellerID string) ([]Listing, error)
     ListAll() []Listing
