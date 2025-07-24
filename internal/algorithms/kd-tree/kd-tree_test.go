@@ -53,8 +53,10 @@ func TestRangeSearch(t *testing.T) {
 			radiusKm: 50.0,
 			expected: []point2D{
 				{X: -79.3832, Y: 43.6532}, // P0 itself
-				{X: -80.0000, Y: 43.5000}, // P1
+				{X: -79.9, Y: 43.7}, // P2
+				{X: -79.000, Y: 43.8000}, //P3
 				{X: -79.8000, Y: 43.6000}, // P4
+
 			},
 		},
 		{
