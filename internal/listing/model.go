@@ -15,6 +15,8 @@ type Listing struct {
     Price       float64        `json:"price" gorm:"not null"`
     Available   bool           `json:"available" gorm:"default:true;not null"`
     CreatedAt   time.Time      `json:"createdAt" gorm:"autoCreateTime"`
+    PortionSize int            `json:"portionSize" gorm:"not null"`    // size of each portion
+    LeftSize    int            `json:"leftSize" gorm:"not null;default:0"` // portions left
     UpdatedAt   time.Time      `json:"updatedAt" gorm:"autoUpdateTime"`
     DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"` // soft‑delete
 }
