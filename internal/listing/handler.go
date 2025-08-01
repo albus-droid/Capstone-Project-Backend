@@ -13,11 +13,51 @@ import (
 
 // RegisterRoutes mounts listing endpoints under /listings
 func RegisterRoutes(r *gin.Engine, svc Service, minioClient *minio.Client) {
-    grp := r.Group("/listings")
-    grp.Use(auth.Middleware())
+    // Public GET routes (no auth)
+    public := r.Group("/listings")
+    public.GET("", func(c *gin.Context) {
+        if sellerID := c.Query("sellerId"); sellerID != "" {
+            list, _ := svc.ListBySeller(sellerID)
+            c.JSON(http.StatusOK, list)
+            return
+        }
+        c.JSON(http.StatusOK, svc.ListAll())
+    })
+
+    public.GET("/:id", func(c *gin.Context) {
+        id := c.Param("id")
+        l, err := svc.GetByID(id)
+        if err != nil {
+            c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+            return
+        }
+        c.JSON(http.StatusOK, l)
+    })
+
+    public.GET("/:id/image/:filename", func(c *gin.Context) {
+        listingID := c.Param("id")
+        filename := c.Param("filename")
+        bucket := os.Getenv("MINIO_BUCKET")
+        if bucket == "" {
+            bucket = "listing-images"
+        }
+        objectName := fmt.Sprintf("listings/%s/%s", listingID, filename)
+
+        signedURL, err := minioClient.PresignedGetObject(
+            c, bucket, objectName, time.Hour, nil,
+        )
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate signed URL"})
+            return
+        }
+        c.JSON(http.StatusOK, gin.H{"signed_url": signedURL.String()})
+    })
+
+    protected := r.Group("/listings")
+    protected.Use(auth.Middleware())
 
     // POST /listings
-    grp.POST("", func(c *gin.Context) {
+    protected.POST("", func(c *gin.Context) {
         var l Listing
         if err := c.ShouldBindJSON(&l); err != nil {
             c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -30,30 +70,8 @@ func RegisterRoutes(r *gin.Engine, svc Service, minioClient *minio.Client) {
         c.JSON(http.StatusCreated, gin.H{"message": "listing created", "id": l.ID,})
     })
 
-    // GET /listings/:id
-    grp.GET("/:id", func(c *gin.Context) {
-        id := c.Param("id")
-        l, err := svc.GetByID(id)
-        if err != nil {
-            c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-            return
-        }
-        c.JSON(http.StatusOK, l)
-    })
-
-    // GET /listings?sellerId=...
-    grp.GET("", func(c *gin.Context) {
-        if sellerID := c.Query("sellerId"); sellerID != "" {
-            list, _ := svc.ListBySeller(sellerID)
-            c.JSON(http.StatusOK, list)
-            return
-        }
-        // fallback: list all
-        c.JSON(http.StatusOK, svc.ListAll())
-    })
-
     // PUT /listings/:id  — update an existing listing
-    grp.PUT("/:id", func(c *gin.Context) {
+    protected.PUT("/:id", func(c *gin.Context) {
         id := c.Param("id")
         var l Listing
         if err := c.ShouldBindJSON(&l); err != nil {
@@ -69,7 +87,7 @@ func RegisterRoutes(r *gin.Engine, svc Service, minioClient *minio.Client) {
     })
 
     // DELETE /listings/:id  — remove a listing
-    grp.DELETE("/:id", func(c *gin.Context) {
+    protected.DELETE("/:id", func(c *gin.Context) {
         id := c.Param("id")
         if err := svc.Delete(id); err != nil {
             c.JSON(http.StatusNotFound, gin.H{"error": "not found or unable to delete"})
@@ -80,7 +98,7 @@ func RegisterRoutes(r *gin.Engine, svc Service, minioClient *minio.Client) {
 
 
     // POST /listings/:id/image — Uploads image to MinIO and saves URL to Listing in DB
-    grp.POST("/:id/image", func(c *gin.Context) {
+    protected.POST("/:id/image", func(c *gin.Context) {
         listingID := c.Param("id")
         file, header, err := c.Request.FormFile("file")
         if err != nil {
@@ -126,29 +144,6 @@ func RegisterRoutes(r *gin.Engine, svc Service, minioClient *minio.Client) {
 
         c.JSON(http.StatusOK, gin.H{
             "image_url": imageAPIUrl,
-        })
-    })
-
-    // GET /listings/:id/image/:filename — Returns signed URL for image view
-    grp.GET("/:id/image/:filename", func(c *gin.Context) {
-        listingID := c.Param("id")
-        filename := c.Param("filename")
-        bucket := os.Getenv("MINIO_BUCKET")
-        if bucket == "" {
-            bucket = "listing-images"
-        }
-        objectName := fmt.Sprintf("listings/%s/%s", listingID, filename)
-
-        signedURL, err := minioClient.PresignedGetObject(
-            c, bucket, objectName, time.Hour, nil,
-        )
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate signed URL"})
-            return
-        }
-
-        c.JSON(http.StatusOK, gin.H{
-            "signed_url": signedURL.String(),
         })
     })
 }
