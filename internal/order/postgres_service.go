@@ -4,14 +4,23 @@ import (
     "errors"
     "time"
     "sort"
-
+    "encoding/json"
     "github.com/google/uuid"
     "gorm.io/gorm"
+    "gorm.io/datatypes"
+
     "github.com/albus-droid/Capstone-Project-Backend/internal/event"
+    "github.com/albus-droid/Capstone-Project-Backend/internal/listing"
 )
 
 type postgresService struct {
     db *gorm.DB
+}
+
+func parseListingIDs(data datatypes.JSON) ([]string, error) {
+    var ids []string
+    err := json.Unmarshal(data, &ids)
+    return ids, err
 }
 
 func NewPostgresService(db *gorm.DB) Service {
@@ -61,8 +70,56 @@ func (s *postgresService) ListByUser(userEmail string) ([]Order, error) {
 }
 
 func (s *postgresService) Accept(id, callerEmail string) error {
-    return s.updateStatus(id, callerEmail, "accepted", "OrderAccepted")
+    return s.db.Transaction(func(tx *gorm.DB) error {
+        // Find the order and check user
+        var o Order
+        if err := tx.First(&o, "id = ?", id).Error; err != nil {
+            if errors.Is(err, gorm.ErrRecordNotFound) {
+                return errors.New("order not found")
+            }
+            return err
+        }
+        if o.UserEmail != callerEmail {
+            return errors.New("forbidden")
+        }
+
+        // Parse listing IDs from JSON
+        listingIDs, err := parseListingIDs(o.ListingIDs)
+        if err != nil {
+            return errors.New("invalid listing IDs")
+        }
+        if len(listingIDs) == 0 {
+            return errors.New("no listings in order")
+        }
+
+        // For each listing ID, decrement left_size if possible
+        for _, lid := range listingIDs {
+            result := tx.Model(&listing.Listing{}).
+                Where("id = ? AND left_size > 0", lid).
+                UpdateColumn("left_size", gorm.Expr("left_size - ?", 1))
+            if result.Error != nil {
+                return result.Error
+            }
+            if result.RowsAffected == 0 {
+                return errors.New("no portions left for listing " + lid)
+            }
+        }
+
+        // Update order status
+        if err := tx.Model(&o).Update("status", "accepted").Error; err != nil {
+            return err
+        }
+        o.Status = "accepted"
+
+        // Emit event
+        go func(ev event.Event) {
+            event.Bus <- ev
+        }(event.Event{Type: "OrderAccepted", Data: o})
+
+        return nil
+    })
 }
+
 
 func (s *postgresService) Complete(id, callerEmail string) error {
     return s.updateStatus(id, callerEmail, "completed", "OrderCompleted")
