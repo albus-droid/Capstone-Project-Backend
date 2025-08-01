@@ -483,6 +483,104 @@ Authorization: Bearer eyJhbGciOiJI…
 
 ---
 
+
+## **3.6 Upload Listing Image (Protected)**
+
+* **Endpoint:** `POST /listings/{id}/image`
+
+* **Description:** Upload an image for a listing. (Saves image URL in listing.)
+
+* **Headers:**
+
+  * `Authorization: Bearer <SELLER_JWT>`
+  * `Content-Type: multipart/form-data`
+
+* **Path Parameters:**
+
+  | Name | Type   | Description  |
+  | ---- | ------ | ------------ |
+  | id   | string | Listing UUID |
+
+* **Form Fields:**
+
+  | Field | Type | Required | Description                                    |
+  | ----- | ---- | -------- | ---------------------------------------------- |
+  | file  | file | yes      | The image file to upload (e.g. `.jpg`, `.png`) |
+
+**Example Request (using `curl`):**
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <SELLER_JWT>" \
+  -F "file=@apples.jpg" \
+  http://localhost:8000/listings/abc123-def456/image
+```
+
+**Response (`200 OK`):**
+
+```json
+{
+  "image_url": "/listings/abc123-def456/image/apples.jpg"
+}
+```
+
+*If your API also updates the Listing’s image field, future GETs of this listing will include the image URL:*
+
+**Example Listing with Image:**
+
+```json
+{
+  "id": "abc123-def456",
+  "sellerId": "seller-uuid",
+  "title": "Fresh Apples",
+  "description": "Crisp and sweet",
+  "price": 2.99,
+  "available": true,
+  "portionSize": 1,
+  "leftSize": 10,
+  "image": "/listings/abc123-def456/image/apples.jpg"
+}
+```
+
+---
+
+## **3.7 Get Signed Image URL (Protected)**
+
+* **Endpoint:** `GET /listings/{id}/image/{filename}`
+
+* **Description:** Get a signed URL for viewing a listing image (valid for 1 hour).
+
+* **Headers:**
+
+  * `Authorization: Bearer <SELLER_JWT>`
+
+* **Path Parameters:**
+
+  | Name     | Type   | Description        |
+  | -------- | ------ | ------------------ |
+  | id       | string | Listing UUID       |
+  | filename | string | Name of image file |
+
+**Example Request:**
+
+```http
+GET /listings/abc123-def456/image/apples.jpg HTTP/1.1
+Authorization: Bearer eyJhbGciOiJI…
+```
+
+**Response (`200 OK`):**
+
+```json
+{
+  "signed_url": "http://localhost:9000/listing-images/listings/abc123-def456/apples.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=..."
+}
+```
+
+* Use this signed URL as the `src` in an `<img>` tag in your frontend.
+
+---
+
+
 ## 4. Orders (Protected)
 
 All endpoints below require the `Authorization` header.

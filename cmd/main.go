@@ -9,6 +9,7 @@ import (
 	"github.com/albus-droid/Capstone-Project-Backend/internal/user"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/db"
 	"github.com/albus-droid/Capstone-Project-Backend/internal/auth"
+	"github.com/albus-droid/Capstone-Project-Backend/internal/image_store"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +18,10 @@ func main() {
 	r := gin.Default()
 	db := db.Init()
 	redisStore := auth.NewRedisStore("redis:6379", "", 0)
+	minioClient, err := image_store.NewMinioClientFromEnv()
+    if err != nil {
+        panic(err)
+    }
 
 	// user routes
 	user.Migrate(db) // optional for dev
@@ -31,7 +36,7 @@ func main() {
 	// Listing routes
 	listing.Migrate(db) // optional for dev
 	lsvc := listing.NewPostgresService(db)
-	listing.RegisterRoutes(r, lsvc)
+	listing.RegisterRoutes(r, lsvc, minioClient)
 
 	// Order
 	order.Migrate(db) // optional for dev
