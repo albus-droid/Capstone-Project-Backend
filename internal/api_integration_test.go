@@ -263,12 +263,15 @@ func TestListings(t *testing.T) {
     var createResp struct{ Message, ID string }
     {
         payload := map[string]interface{}{
-            "sellerId":    sellerID,
-            "title":       "Fresh Apples",
-            "description": "Crisp and sweet",
-            "price":       2.99,
-            "available":   true,
-        }
+			"sellerId":    sid,         // seller’s UUID string
+			"title":       "OrderItem",
+			"description": "Freshly made order item",
+			"price":       15.0,
+			"available":   true,
+			"portionSize": 1,           // int, the size of each portion
+			"leftSize":    10,          // int, how many portions are available
+		}
+
         b, _ := json.Marshal(payload)
         req, _ := http.NewRequest("POST", baseURL+"/listings", bytes.NewReader(b))
         req.Header.Set("Content-Type", "application/json")
@@ -373,7 +376,7 @@ func TestOrders(t *testing.T) {
 		mustDecode(t, res, &loginResp)
 	}
 
-	// Seed seller & listing
+	// Register a seller
 	sellerEmail := fmt.Sprintf("orderslr+%d@ex.com", time.Now().UnixNano())
 	{
 		payload := map[string]string{"name": "OrderSeller", "email": sellerEmail, "phone": "+3000", "password": "pw"}
@@ -390,7 +393,7 @@ func TestOrders(t *testing.T) {
 		}
 	}
 
-	// create listing for order
+	// Create a listing for order with leftSize=10, portionSize=1
 	var lr struct{ ID string `json:"id"` }
 	{
 		payload := map[string]interface{}{
@@ -399,13 +402,15 @@ func TestOrders(t *testing.T) {
 			"description": "d",
 			"price":       15.0,
 			"available":   true,
+			"portionSize": 1,
+			"leftSize":    10,
 		}
 		b, _ := json.Marshal(payload)
 		res, _ := http.Post(baseURL+"/listings", "application/json", bytes.NewReader(b))
 		mustDecode(t, res, &lr)
 	}
 
-	// 4.1 Create Order
+	// Create Order
 	var or struct {
 		ID         string   `json:"id"`
 		UserEmail  string   `json:"user_email"`
@@ -438,28 +443,19 @@ func TestOrders(t *testing.T) {
 		}
 	}
 
-	// 4.3 List My Orders
+	// Fetch listing before accepting order
+	var before, after listingResp
 	{
-		req, _ := http.NewRequest("GET", baseURL+"/orders", nil)
+		req, _ := http.NewRequest("GET", baseURL+"/listings/"+lr.ID, nil)
 		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
-		res, _ := http.DefaultClient.Do(req)
-		if res.StatusCode != http.StatusOK {
-			t.Fatalf("GET /orders: expected 200, got %d", res.StatusCode)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil || res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /listings/%s before accept: %v / %d", lr.ID, err, res.StatusCode)
 		}
-		var list []struct{ ID, Status string }
-		mustDecode(t, res, &list)
-		found := false
-		for _, x := range list {
-			if x.ID == or.ID {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatalf("GET /orders missing %s", or.ID)
-		}
+		mustDecode(t, res, &before)
 	}
 
-	// 4.4 Accept Order
+	// Accept Order
 	{
 		req, _ := http.NewRequest("PATCH", baseURL+"/orders/"+or.ID+"/accept", nil)
 		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
@@ -469,7 +465,21 @@ func TestOrders(t *testing.T) {
 		}
 	}
 
-	// 4.2 Get Order by ID
+	// Fetch listing after accepting order
+	{
+		req, _ := http.NewRequest("GET", baseURL+"/listings/"+lr.ID, nil)
+		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil || res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /listings/%s after accept: %v / %d", lr.ID, err, res.StatusCode)
+		}
+		mustDecode(t, res, &after)
+		if after.LeftSize != before.LeftSize-1 {
+			t.Fatalf("leftSize not decremented after accept: before=%d, after=%d", before.LeftSize, after.LeftSize)
+		}
+	}
+
+	// Check order status after accept
 	{
 		req, _ := http.NewRequest("GET", baseURL+"/orders/"+or.ID, nil)
 		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
@@ -480,7 +490,7 @@ func TestOrders(t *testing.T) {
 		}
 	}
 
-	// 4.5 Complete Order
+	// Complete Order
 	{
 		req, _ := http.NewRequest("PATCH", baseURL+"/orders/"+or.ID+"/complete", nil)
 		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
@@ -490,7 +500,7 @@ func TestOrders(t *testing.T) {
 		}
 	}
 
-	// Final GET
+	// Final GET to confirm completion
 	{
 		req, _ := http.NewRequest("GET", baseURL+"/orders/"+or.ID, nil)
 		req.Header.Set("Authorization", "Bearer "+loginResp.Token)

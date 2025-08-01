@@ -6,7 +6,7 @@ This document lists all API endpoints, their parameters, and example requests/re
 
 ## Authentication Header
 
-All *protected* endpoints require the following HTTP header:
+All *protected* endpoints require:
 
 ```
 Authorization: Bearer <JWT_TOKEN>
@@ -18,115 +18,117 @@ Authorization: Bearer <JWT_TOKEN>
 
 ### 1.1 Register
 
-* **Endpoint**: `POST /users/register`
+* **Endpoint:** `POST /users/register`
+* **Description:** Create a new user account.
 
-* **Description**: Create a new user account.
+**Request Body (JSON):**
 
-* **Request Body (JSON)**:
+| Field    | Type   | Required | Description          |
+| -------- | ------ | -------- | -------------------- |
+| name     | string | yes      | Full name            |
+| email    | string | yes      | Unique email address |
+| password | string | yes      | Plain-text password  |
 
-  | Field    | Type   | Required | Description          |
-  | -------- | ------ | -------- | -------------------- |
-  | name     | string | yes      | Full name            |
-  | email    | string | yes      | Unique email address |
-  | password | string | yes      | Plain-text password  |
+**Example Request:**
 
-* **Example Request**:
+```http
+POST /users/register HTTP/1.1
+Content-Type: application/json
 
-  ```http
-  POST /users/register HTTP/1.1
-  Content-Type: application/json
+{
+  "name": "Alice Example",
+  "email": "alice@example.com",
+  "password": "p@ssw0rd"
+}
+```
 
-  {
-    "name": "Alice Example",
-    "email": "alice@example.com",
-    "password": "p@ssw0rd"
-  }
-  ```
+**Example Response** (`201 Created`):
 
-* **Example Response** (`201 Created`):
+```json
+{ "message": "registered" }
+```
 
-  ```json
-  { "message": "registered" }
-  ```
+---
 
 ### 1.2 Login
 
-* **Endpoint**: `POST /users/login`
+* **Endpoint:** `POST /users/login`
+* **Description:** Authenticate and receive a JWT.
 
-* **Description**: Authenticate and receive a JWT.
+**Request Body (JSON):**
 
-* **Request Body (JSON)**:
+| Field    | Type   | Required | Description         |
+| -------- | ------ | -------- | ------------------- |
+| email    | string | yes      | Registered email    |
+| password | string | yes      | Plain-text password |
 
-  | Field    | Type   | Required | Description         |
-  | -------- | ------ | -------- | ------------------- |
-  | email    | string | yes      | Registered email    |
-  | password | string | yes      | Plain-text password |
+**Example Request:**
 
-* **Example Request**:
+```http
+POST /users/login HTTP/1.1
+Content-Type: application/json
 
-  ```http
-  POST /users/login HTTP/1.1
-  Content-Type: application/json
+{
+  "email": "alice@example.com",
+  "password": "p@ssw0rd"
+}
+```
 
-  {
-    "email": "alice@example.com",
-    "password": "p@ssw0rd"
-  }
-  ```
+**Example Response** (`200 OK`):
 
-* **Example Response** (`200 OK`):
+```json
+{ "token": "eyJhbGciOiJI..." }
+```
 
-  ```json
-  { "token": "eyJhbGciOiJI..." }
-  ```
+---
 
 ### 1.3 Get Profile (Protected)
 
-* **Endpoint**: `GET /users/profile`
+* **Endpoint:** `GET /users/profile`
+* **Description:** Retrieve the profile of the authenticated user.
 
-* **Description**: Retrieve the profile of the authenticated user.
+**Headers:**
 
-* **Headers**:
+| Header        | Value          |
+| ------------- | -------------- |
+| Authorization | Bearer <token> |
 
-  | Header        | Value           |
-  | ------------- | --------------- |
-  | Authorization | Bearer \<token> |
+**Example Request:**
 
-* **Example Request**:
+```http
+GET /users/profile HTTP/1.1
+Authorization: Bearer eyJhbGciOiJI...
+```
 
-  ```http
-  GET /users/profile HTTP/1.1
-  Authorization: Bearer eyJhbGciOiJI...
-  ```
+**Example Response** (`200 OK`):
 
-* **Example Response** (`200 OK`):
+```json
+{
+  "id": "user-uuid",
+  "name": "Alice Example",
+  "email": "alice@example.com"
+}
+```
 
-  ```json
-  {
-    "id": "user-uuid",
-    "name": "Alice Example",
-    "email": "alice@example.com"
-  }
-  ```
-  
 ---
+
 ## 2. Sellers
 
 ### 2.1 Register Seller
 
-- **Endpoint**: `POST /sellers/register`
-- **Description**: Create a new seller account.
+* **Endpoint:** `POST /sellers/register`
+* **Description:** Create a new seller account.
 
-#### Request Body
+**Request Body:**
 
-| Field    | Type   | Required | Description                     |
-| -------- | ------ | -------- | ------------------------------- |
-| name     | string | yes      | Seller’s display name           |
-| email    | string | yes      | Contact email (must be unique)  |
-| phone    | string | yes      | Phone number                    |
-| password | string | yes      | Plain-text password (min length 8) |
+| Field    | Type   | Required | Description                 |
+| -------- | ------ | -------- | --------------------------- |
+| name     | string | yes      | Seller’s display name       |
+| email    | string | yes      | Contact email (unique)      |
+| phone    | string | yes      | Phone number                |
+| password | string | yes      | Plain-text password (min 8) |
 
-#### Example Request
+**Example Request:**
 
 ```http
 POST /sellers/register HTTP/1.1
@@ -138,49 +140,41 @@ Content-Type: application/json
   "phone": "+1-555-1234",
   "password": "hunter2!"
 }
-````
-
-#### Responses
-
-**201 Created**
-
-```json
-{
-  "message": "seller registered"
-}
 ```
 
-**409 Conflict** (email already exists)
+**201 Created:**
 
 ```json
-{
-  "error": "seller already exists"
-}
+{ "message": "seller registered" }
 ```
 
-**400 Bad Request** (validation error)
+**409 Conflict:**
 
 ```json
-{
-  "error": "invalid request payload"
-}
+{ "error": "seller already exists" }
+```
+
+**400 Bad Request:**
+
+```json
+{ "error": "invalid request payload" }
 ```
 
 ---
 
 ### 2.2 Seller Login
 
-* **Endpoint**: `POST /sellers/login`
-* **Description**: Authenticates a seller and returns a JWT token for future authenticated requests.
+* **Endpoint:** `POST /sellers/login`
+* **Description:** Authenticates a seller and returns a JWT.
 
-#### Request Body
+**Request Body:**
 
 | Field    | Type   | Required | Description          |
 | -------- | ------ | -------- | -------------------- |
 | email    | string | yes      | Seller email address |
 | password | string | yes      | Plain-text password  |
 
-#### Example Request
+**Example Request:**
 
 ```http
 POST /sellers/login HTTP/1.1
@@ -192,54 +186,44 @@ Content-Type: application/json
 }
 ```
 
-#### Responses
-
-**200 OK**
+**200 OK:**
 
 ```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-}
+{ "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6..." }
 ```
 
-**401 Unauthorized** (invalid credentials)
+**401 Unauthorized:**
 
 ```json
-{
-  "error": "invalid credentials"
-}
+{ "error": "invalid credentials" }
 ```
 
-**400 Bad Request** (invalid request format)
+**400 Bad Request:**
 
 ```json
-{
-  "error": "invalid request payload"
-}
+{ "error": "invalid request payload" }
 ```
 
 ---
 
 ### 2.3 Get Seller by ID
 
-* **Endpoint**: `GET /sellers/{id}`
-* **Description**: Fetch a seller’s public details by their unique ID.
+* **Endpoint:** `GET /sellers/{id}`
+* **Description:** Fetch seller’s public details by UUID.
 
-#### Path Parameters
+**Path Parameters:**
 
 | Name | Type   | Description |
 | ---- | ------ | ----------- |
 | id   | string | Seller UUID |
 
-#### Example Request
+**Example Request:**
 
 ```http
 GET /sellers/123e4567-e89b-12d3-a456-426614174000 HTTP/1.1
 ```
 
-#### Responses
-
-**200 OK**
+**200 OK:**
 
 ```json
 {
@@ -251,28 +235,26 @@ GET /sellers/123e4567-e89b-12d3-a456-426614174000 HTTP/1.1
 }
 ```
 
-**404 Not Found**
+**404 Not Found:**
 
 ```json
-{
-  "error": "not found"
-}
+{ "error": "not found" }
 ```
 
 ---
 
 ### 2.4 List All Sellers
 
-* **Endpoint**: `GET /sellers`
-* **Description**: Retrieve a list of all sellers, sorted by ID.
+* **Endpoint:** `GET /sellers`
+* **Description:** Retrieve all sellers.
 
-#### Example Request
+**Example Request:**
 
 ```http
 GET /sellers HTTP/1.1
 ```
 
-#### Response (200 OK)
+**Response (200 OK):**
 
 ```json
 [
@@ -297,7 +279,7 @@ GET /sellers HTTP/1.1
 
 ## 3. Listings (Protected)
 
-> **All** listing endpoints below require:
+> All endpoints below require:
 >
 > ```
 > Authorization: Bearer <SELLER_JWT_TOKEN>
@@ -305,194 +287,199 @@ GET /sellers HTTP/1.1
 
 ### 3.1 Create Listing
 
-* **Endpoint**: `POST /listings`
+* **Endpoint:** `POST /listings`
+* **Description:** Create a new listing. The server generates a unique listing ID.
 
-* **Headers**:
+**Headers:**
 
-  | Name          | Value                 |
-  | ------------- | --------------------- |
-  | Authorization | Bearer `<SELLER_JWT>` |
-  | Content-Type  | application/json      |
+| Name          | Value                 |
+| ------------- | --------------------- |
+| Authorization | Bearer `<SELLER_JWT>` |
+| Content-Type  | application/json      |
 
-* **Description**: Create a new listing. The server generates a unique listing ID.
+**Request Body:**
 
-* **Request Body**:
+| Field       | Type    | Required | Description             |
+| ----------- | ------- | -------- | ----------------------- |
+| sellerId    | string  | yes      | Existing Seller UUID    |
+| title       | string  | yes      | Listing title           |
+| description | string  | yes      | Detailed description    |
+| price       | float   | yes      | Price in USD            |
+| available   | boolean | yes      | Availability flag       |
+| portionSize | int     | yes      | Size of each portion    |
+| leftSize    | int     | yes      | Number of portions left |
 
-  | Field       | Type    | Required | Description          |
-  | ----------- | ------- | -------- | -------------------- |
-  | sellerId    | string  | yes      | Existing Seller UUID |
-  | title       | string  | yes      | Listing title        |
-  | description | string  | yes      | Detailed description |
-  | price       | float   | yes      | Price in USD         |
-  | available   | boolean | yes      | Availability flag    |
+**Example Request:**
 
-* **Example**:
+```http
+POST /listings HTTP/1.1
+Authorization: Bearer eyJhbGciOiJI…
+Content-Type: application/json
 
-  ```http
-  POST /listings HTTP/1.1
-  Authorization: Bearer eyJhbGciOiJI…
-  Content-Type: application/json
+{
+  "sellerId": "seller-uuid",
+  "title": "Fresh Apples",
+  "description": "Crisp and sweet",
+  "price": 2.99,
+  "available": true,
+  "portionSize": 1,
+  "leftSize": 10
+}
+```
 
-  {
-    "sellerId": "seller-uuid",
-    "title": "Fresh Apples",
-    "description": "Crisp and sweet",
-    "price": 2.99,
-    "available": true
-  }
-  ```
+**201 Created:**
 
-* **Response** (`201 Created`):
-
-  ```json
-  {
-    "message": "listing created",
-    "id": "generated-uuid"
-  }
-  ```
+```json
+{
+  "message": "listing created",
+  "id": "generated-uuid"
+}
+```
 
 ---
 
 ### 3.2 Get Listing by ID
 
-* **Endpoint**: `GET /listings/{id}`
+* **Endpoint:** `GET /listings/{id}`
+* **Description:** Retrieve a listing by its ID.
 
-* **Headers**:
+**Headers:**
 
-  | Name          | Value                 |
-  | ------------- | --------------------- |
-  | Authorization | Bearer `<SELLER_JWT>` |
+| Name          | Value                 |
+| ------------- | --------------------- |
+| Authorization | Bearer `<SELLER_JWT>` |
 
-* **Description**: Retrieve a listing by its ID.
+**Example Request:**
 
-* **Example**:
+```http
+GET /listings/abc123-def456 HTTP/1.1
+Authorization: Bearer eyJhbGciOiJI…
+```
 
-  ```http
-  GET /listings/abc123-def456 HTTP/1.1
-  Authorization: Bearer eyJhbGciOiJI…
-  ```
+**200 OK:**
 
-* **Response** (`200 OK`):
+```json
+{
+  "id": "abc123-def456",
+  "sellerId": "seller-uuid",
+  "title": "Fresh Apples",
+  "description": "Crisp and sweet",
+  "price": 2.99,
+  "available": true,
+  "portionSize": 1,
+  "leftSize": 10
+}
+```
 
-  ```json
+---
+
+### 3.3 List Listings (Optional Filter)
+
+* **Endpoint:** `GET /listings`
+* **Description:** Get all listings or filter by seller.
+
+**Headers:**
+
+| Name          | Value                 |
+| ------------- | --------------------- |
+| Authorization | Bearer `<SELLER_JWT>` |
+
+**Query Parameters:**
+
+| Name     | Type   | Description            |
+| -------- | ------ | ---------------------- |
+| sellerId | string | (optional) Seller UUID |
+
+**Example Request:**
+
+```http
+GET /listings?sellerId=seller-uuid HTTP/1.1
+Authorization: Bearer eyJhbGciOiJI…
+```
+
+**200 OK:**
+
+```json
+[
   {
     "id": "abc123-def456",
     "sellerId": "seller-uuid",
     "title": "Fresh Apples",
     "description": "Crisp and sweet",
     "price": 2.99,
-    "available": true
+    "available": true,
+    "portionSize": 1,
+    "leftSize": 10
   }
-  ```
-
----
-
-### 3.3 List Listings (Optional Filter)
-
-* **Endpoint**: `GET /listings`
-
-* **Headers**:
-
-  | Name          | Value                 |
-  | ------------- | --------------------- |
-  | Authorization | Bearer `<SELLER_JWT>` |
-
-* **Description**: Get all listings, or only those for a specific seller.
-
-* **Query Parameters**:
-
-  | Name     | Type   | Description            |
-  | -------- | ------ | ---------------------- |
-  | sellerId | string | (optional) Seller UUID |
-
-* **Examples**:
-
-  ```http
-  GET /listings HTTP/1.1
-  Authorization: Bearer eyJhbGciOiJI…
-  ```
-
-  ```http
-  GET /listings?sellerId=seller-uuid HTTP/1.1
-  Authorization: Bearer eyJhbGciOiJI…
-  ```
-
-* **Response** (`200 OK`):
-
-  ```json
-  [
-    { /* listing1 */ },
-    { /* listing2 */ }
-  ]
-  ```
+]
+```
 
 ---
 
 ### 3.4 Update Listing
 
-* **Endpoint**: `PUT /listings/{id}`
+* **Endpoint:** `PUT /listings/{id}`
+* **Description:** Update fields of a listing. `{id}` is the listing UUID.
 
-* **Headers**:
+**Headers:**
 
-  | Name          | Value                 |
-  | ------------- | --------------------- |
-  | Authorization | Bearer `<SELLER_JWT>` |
-  | Content-Type  | application/json      |
+| Name          | Value                 |
+| ------------- | --------------------- |
+| Authorization | Bearer `<SELLER_JWT>` |
+| Content-Type  | application/json      |
 
-* **Description**: Update one or more fields of an existing listing. The `{id}` in the URL is authoritative.
+**Request Body:** (any subset)
 
-* **Request Body**: any subset of:
+| Field       | Type    | Description                |
+| ----------- | ------- | -------------------------- |
+| sellerId    | string  | Change seller (if allowed) |
+| title       | string  | New listing title          |
+| description | string  | Updated description        |
+| price       | float   | New price in USD           |
+| available   | boolean | New availability flag      |
+| portionSize | int     | Portion size (optional)    |
+| leftSize    | int     | Number of portions left    |
 
-  | Field       | Type    | Description                |
-  | ----------- | ------- | -------------------------- |
-  | sellerId    | string  | Change seller (if allowed) |
-  | title       | string  | New listing title          |
-  | description | string  | Updated description        |
-  | price       | float   | New price in USD           |
-  | available   | boolean | New availability flag      |
+**Example Request:**
 
-* **Example**:
+```http
+PUT /listings/abc123-def456 HTTP/1.1
+Authorization: Bearer eyJhbGciOiJI…
+Content-Type: application/json
 
-  ```http
-  PUT /listings/abc123-def456 HTTP/1.1
-  Authorization: Bearer eyJhbGciOiJI…
-  Content-Type: application/json
+{
+  "price": 3.49,
+  "available": false
+}
+```
 
-  {
-    "price": 3.49,
-    "available": false
-  }
-  ```
+**200 OK:**
 
-* **Response** (`200 OK`):
-
-  ```json
-  { "message": "listing updated" }
-  ```
+```json
+{ "message": "listing updated" }
+```
 
 ---
 
 ### 3.5 Delete Listing
 
-* **Endpoint**: `DELETE /listings/{id}`
+* **Endpoint:** `DELETE /listings/{id}`
+* **Description:** Remove a listing by its ID.
 
-* **Headers**:
+**Headers:**
 
-  | Name          | Value                 |
-  | ------------- | --------------------- |
-  | Authorization | Bearer `<SELLER_JWT>` |
+| Name          | Value                 |
+| ------------- | --------------------- |
+| Authorization | Bearer `<SELLER_JWT>` |
 
-* **Description**: Remove a listing by its ID.
+**Example Request:**
 
-* **Example**:
+```http
+DELETE /listings/abc123-def456 HTTP/1.1
+Authorization: Bearer eyJhbGciOiJI…
+```
 
-  ```http
-  DELETE /listings/abc123-def456 HTTP/1.1
-  Authorization: Bearer eyJhbGciOiJI…
-  ```
-
-* **Response** (`204 No Content`): No body.
-
+**Response:** (`204 No Content`)
 
 ---
 
@@ -502,140 +489,135 @@ All endpoints below require the `Authorization` header.
 
 ### 4.1 Create Order
 
-* **Endpoint**: `POST /orders`
+* **Endpoint:** `POST /orders`
+* **Description:** Place a new order.
 
-* **Description**: Place a new order.
+**Request Body (JSON):**
 
-* **Request Body (JSON)**:
+| Field      | Type      | Required | Description                           |
+| ---------- | --------- | -------- | ------------------------------------- |
+| id         | string    | no       | Client-supplied Order UUID (optional) |
+| listingIds | string\[] | yes      | Array of Listing UUIDs                |
+| sellerId   | string    | yes      | Seller UUID                           |
+| total      | float     | yes      | Order total in USD                    |
 
-  | Field      | Type      | Required | Description                           |
-  | ---------- | --------- | -------- | ------------------------------------- |
-  | id         | string    | no       | Client-supplied Order UUID (optional) |
-  | listingIds | string\[] | yes      | Array of Listing UUIDs                |
-  | sellerId   | string    | yes      | Seller UUID                           |
-  | total      | float     | yes      | Order total in USD                    |
+**Example Request:**
 
- **Example Request**:
+```http
+POST /orders HTTP/1.1
+Authorization: Bearer eyJhbGci...
+Content-Type: application/json
 
-  ```http
-  POST /orders HTTP/1.1
-  Authorization: Bearer eyJhbGci...
-  Content-Type: application/json
+{
+  "listingIds": ["l1","l2"],
+  "sellerId": "seller-uuid",
+  "total": 19.98
+}
+```
 
-  {
-    "listingIds": ["l1","l2"],
-    "sellerId": "seller-uuid",
-    "total": 19.98
-  }
-  ```
+**201 Created:**
 
-* **Example Response** (`201 Created`):
+```json
+{
+  "id": "order-uuid",
+  "user_email": "alice@example.com",
+  "sellerId": "seller-uuid",
+  "listingIds": ["l1","l2"],
+  "total": 19.98,
+  "createdAt": 1620000000,
+  "status": "pending"
+}
+```
 
-  ```json
-  {
-    "id": "order-uuid",
-    "user_email": "alice@example.com",
-    "sellerId": "seller-uuid",
-    "listingIds": ["l1","l2"],
-    "total": 19.98,
-    "createdAt": 1620000000,
-    "status": "pending"
-  }
-  ```
+---
 
 ### 4.2 Get Order by ID
 
-* **Endpoint**: `GET /orders/{id}`
+* **Endpoint:** `GET /orders/{id}`
+* **Description:** Retrieve an order (only the owner).
 
-* **Description**: Retrieve an order (only the owner).
+**Example Request:**
 
-* **Path Parameters**:
+```http
+GET /orders/order-uuid HTTP/1.1
+Authorization: Bearer eyJhbGci...
+```
 
-  | Name | Type   | Description |
-  | ---- | ------ | ----------- |
-  | id   | string | Order UUID  |
+**Example Response** (`200 OK`):
 
-* **Example Request**:
+```json
+{
+  "id": "order-uuid",
+  "user_email": "alice@example.com",
+  "sellerId": "seller-uuid",
+  "listingIds": ["l1","l2"],
+  "total": 19.98,
+  "createdAt": 1620000000,
+  "status": "accepted"
+}
+```
 
-  ```http
-  GET /orders/order-uuid HTTP/1.1
-  Authorization: Bearer eyJhbGci...
-  ```
-
-* **Example Response** (`200 OK`):
-
-  ```json
-  { /* Order object */ }
-  ```
+---
 
 ### 4.3 List My Orders
 
-* **Endpoint**: `GET /orders`
+* **Endpoint:** `GET /orders`
+* **Description:** List all orders placed by the authenticated user.
 
-* **Description**: List all orders placed by the authenticated user.
+**Example Request:**
 
-* **Example Request**:
+```http
+GET /orders HTTP/1.1
+Authorization: Bearer eyJhbGci...
+```
 
-  ```http
-  GET /orders HTTP/1.1
-  Authorization: Bearer eyJhbGci...
-  ```
+**Example Response** (`200 OK`):
 
-* **Example Response** (`200 OK`):
+```json
+[
+  { /* order 1 object */ },
+  { /* order 2 object */ }
+]
+```
 
-  ```json
-  [
-    { /* order 1 */ },
-    { /* order 2 */ }
-  ]
-  ```
+---
 
 ### 4.4 Accept Order
 
-* **Endpoint**: `PATCH /orders/{id}/accept`
+* **Endpoint:** `PATCH /orders/{id}/accept`
+* **Description:** Mark an order as accepted (by seller or owner).
 
-* **Description**: Mark an order as accepted (by seller or owner).
+**Example Request:**
 
-* **Path Parameters**:
+```http
+PATCH /orders/order-uuid/accept HTTP/1.1
+Authorization: Bearer eyJhbGci...
+```
 
-  | Name | Type   | Description |
-  | ---- | ------ | ----------- |
-  | id   | string | Order UUID  |
+**Example Response** (`200 OK`):
 
-* **Example Request**:
+```json
+{ "message": "order accepted" }
+```
 
-  ```http
-  PATCH /orders/order-uuid/accept HTTP/1.1
-  Authorization: Bearer eyJhbGci...
-  ```
-
-* **Example Response** (`200 OK`):
-
-  ```json
-  { "message": "order accepted" }
-  ```
+---
 
 ### 4.5 Complete Order
 
-* **Endpoint**: `PATCH /orders/{id}/complete`
+* **Endpoint:** `PATCH /orders/{id}/complete`
+* **Description:** Mark an order as completed.
 
-* **Description**: Mark an order as completed.
+**Example Request:**
 
-* **Path Parameters**:
+```http
+PATCH /orders/order-uuid/complete HTTP/1.1
+Authorization: Bearer eyJhbGci...
+```
 
-  | Name | Type   | Description |
-  | ---- | ------ | ----------- |
-  | id   | string | Order UUID  |
+**Example Response** (`200 OK`):
 
-* **Example Request**:
+```json
+{ "message": "order completed" }
+```
 
-  ```http
-  PATCH /orders/order-uuid/complete HTTP/1.1
-  Authorization: Bearer eyJhbGci...
-  ```
-
-* **Example Response** (`200 OK`):
-
-  ```json
-  { "message": "order completed" }
-  ```
+---
