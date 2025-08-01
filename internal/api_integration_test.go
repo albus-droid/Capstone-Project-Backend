@@ -263,7 +263,7 @@ func TestListings(t *testing.T) {
     var createResp struct{ Message, ID string }
     {
         payload := map[string]interface{}{
-			"sellerId":    sid,         // seller’s UUID string
+			"sellerId":    sellerID,         // seller’s UUID string
 			"title":       "OrderItem",
 			"description": "Freshly made order item",
 			"price":       15.0,
