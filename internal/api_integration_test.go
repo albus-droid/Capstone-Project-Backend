@@ -354,17 +354,15 @@ func TestListings(t *testing.T) {
 // =================================================================================
 
 func TestOrders(t *testing.T) {
-	// Register & login a user
-	email := fmt.Sprintf("orderusr+%d@ex.com", time.Now().UnixNano())
-	pass := "pw"
+	// 1. Register & login user
+	userEmail := fmt.Sprintf("orderusr+%d@ex.com", time.Now().UnixNano())
+	userPass := "pw"
+	http.Post(baseURL+"/users/register", "application/json",
+		bytes.NewReader([]byte(fmt.Sprintf(`{"name":"OrderUser","email":"%s","password":"%s"}`, userEmail, userPass))))
+
+	var userLogin struct{ Token string `json:"token"` }
 	{
-		payload := map[string]string{"name": "OrderUser", "email": email, "password": pass}
-		b, _ := json.Marshal(payload)
-		http.Post(baseURL+"/users/register", "application/json", bytes.NewReader(b))
-	}
-	var loginResp struct{ Token string `json:"token"` }
-	{
-		payload := map[string]string{"email": email, "password": pass}
+		payload := map[string]string{"email": userEmail, "password": userPass}
 		b, _ := json.Marshal(payload)
 		res, err := http.Post(baseURL+"/users/login", "application/json", bytes.NewReader(b))
 		if err != nil {
@@ -373,58 +371,71 @@ func TestOrders(t *testing.T) {
 		if res.StatusCode != http.StatusOK {
 			t.Fatalf("POST /users/login: expected 200, got %d", res.StatusCode)
 		}
-		mustDecode(t, res, &loginResp)
+		mustDecode(t, res, &userLogin)
 	}
 
-	// Register a seller
+	// 2. Register & login seller
 	sellerEmail := fmt.Sprintf("orderslr+%d@ex.com", time.Now().UnixNano())
+	http.Post(baseURL+"/sellers/register", "application/json",
+		bytes.NewReader([]byte(fmt.Sprintf(`{"name":"OrderSeller","email":"%s","phone":"+3000","password":"pw"}`, sellerEmail))))
+
+	var sellerLogin struct{ Token string `json:"token"` }
 	{
-		payload := map[string]string{"name": "OrderSeller", "email": sellerEmail, "phone": "+3000", "password": "pw"}
+		payload := map[string]string{"email": sellerEmail, "password": "pw"}
 		b, _ := json.Marshal(payload)
-		http.Post(baseURL+"/sellers/register", "application/json", bytes.NewReader(b))
+		res, err := http.Post(baseURL+"/sellers/login", "application/json", bytes.NewReader(b))
+		if err != nil || res.StatusCode != http.StatusOK {
+			t.Fatalf("seller login failed: %v, code=%d", err, res.StatusCode)
+		}
+		mustDecode(t, res, &sellerLogin)
 	}
-	res, _ := http.Get(baseURL + "/sellers")
-	var sellers []struct{ ID, Email string }
-	mustDecode(t, res, &sellers)
+	sellerAuth := "Bearer " + sellerLogin.Token
+
+	// 3. Get seller ID
 	var sid string
-	for _, s := range sellers {
-		if s.Email == sellerEmail {
-			sid = s.ID
+	{
+		res, _ := http.Get(baseURL + "/sellers")
+		var sellers []struct{ ID, Email string }
+		mustDecode(t, res, &sellers)
+		for _, s := range sellers {
+			if s.Email == sellerEmail {
+				sid = s.ID
+				break
+			}
+		}
+		if sid == "" {
+			t.Fatal("could not find new seller in /sellers")
 		}
 	}
 
-	type listingResp struct {
-		ID          string    `json:"id"`
-		SellerID    string    `json:"sellerId"`
-		Title       string    `json:"title"`
-		Description string    `json:"description"`
-		Price       float64   `json:"price"`
-		Available   bool      `json:"available"`
-		PortionSize int       `json:"portionSize"`
-		LeftSize    int       `json:"leftSize"`
-		CreatedAt   string    `json:"createdAt"`   // or time.Time if your API returns proper time
-		UpdatedAt   string    `json:"updatedAt"`
-	}
-
-	// Create a listing for order with leftSize=10, portionSize=1
-	var lr struct{ ID string `json:"id"` }
+	// 4. Create listing (leftSize=10, portionSize=1)
+	var listingCreateResp struct{ ID string `json:"id"` }
 	{
 		payload := map[string]interface{}{
 			"sellerId":    sid,
 			"title":       "OrderItem",
-			"description": "d",
+			"description": "Test listing for order flow",
 			"price":       15.0,
 			"available":   true,
 			"portionSize": 1,
 			"leftSize":    10,
 		}
 		b, _ := json.Marshal(payload)
-		res, _ := http.Post(baseURL+"/listings", "application/json", bytes.NewReader(b))
-		mustDecode(t, res, &lr)
+		req, _ := http.NewRequest("POST", baseURL+"/listings", bytes.NewReader(b))
+		req.Header.Set("Authorization", sellerAuth)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil || res.StatusCode != http.StatusCreated {
+			t.Fatalf("POST /listings failed: %v / %d", err, res.StatusCode)
+		}
+		mustDecode(t, res, &listingCreateResp)
+		if listingCreateResp.ID == "" {
+			t.Fatal("listing create: missing id")
+		}
 	}
 
-	// Create Order
-	var or struct {
+	// 5. Place order as user
+	var orderResp struct {
 		ID         string   `json:"id"`
 		UserEmail  string   `json:"user_email"`
 		SellerID   string   `json:"sellerId"`
@@ -435,14 +446,14 @@ func TestOrders(t *testing.T) {
 	}
 	{
 		payload := map[string]interface{}{
-			"listingIds": []string{lr.ID},
+			"listingIds": []string{listingCreateResp.ID},
 			"sellerId":   sid,
 			"total":      15.0,
 		}
 		b, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", baseURL+"/orders", bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+userLogin.Token)
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatalf("POST /orders: %v", err)
@@ -450,41 +461,54 @@ func TestOrders(t *testing.T) {
 		if res.StatusCode != http.StatusCreated {
 			t.Fatalf("POST /orders: expected 201, got %d", res.StatusCode)
 		}
-		mustDecode(t, res, &or)
-		if or.Status != "pending" {
-			t.Fatalf("new order status=%q; want pending", or.Status)
+		mustDecode(t, res, &orderResp)
+		if orderResp.Status != "pending" {
+			t.Fatalf("new order status=%q; want pending", orderResp.Status)
 		}
 	}
 
-	// Fetch listing before accepting order
+	// 6. Fetch listing before and after accepting order
+	type listingResp struct {
+		ID          string  `json:"id"`
+		SellerID    string  `json:"sellerId"`
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
+		Price       float64 `json:"price"`
+		Available   bool    `json:"available"`
+		PortionSize int     `json:"portionSize"`
+		LeftSize    int     `json:"leftSize"`
+		CreatedAt   string  `json:"createdAt"`
+		UpdatedAt   string  `json:"updatedAt"`
+	}
 	var before, after listingResp
 	{
-		req, _ := http.NewRequest("GET", baseURL+"/listings/"+lr.ID, nil)
-		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		// Before accept
+		req, _ := http.NewRequest("GET", baseURL+"/listings/"+listingCreateResp.ID, nil)
+		req.Header.Set("Authorization", sellerAuth)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil || res.StatusCode != http.StatusOK {
-			t.Fatalf("GET /listings/%s before accept: %v / %d", lr.ID, err, res.StatusCode)
+			t.Fatalf("GET /listings/%s before accept: %v / %d", listingCreateResp.ID, err, res.StatusCode)
 		}
 		mustDecode(t, res, &before)
 	}
 
-	// Accept Order
+	// 7. Accept order as user (you can use seller in your logic if needed)
 	{
-		req, _ := http.NewRequest("PATCH", baseURL+"/orders/"+or.ID+"/accept", nil)
-		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		req, _ := http.NewRequest("PATCH", baseURL+"/orders/"+orderResp.ID+"/accept", nil)
+		req.Header.Set("Authorization", "Bearer "+userLogin.Token)
 		res, _ := http.DefaultClient.Do(req)
 		if res.StatusCode != http.StatusOK {
-			t.Fatalf("PATCH /orders/%s/accept: expected 200, got %d", or.ID, res.StatusCode)
+			t.Fatalf("PATCH /orders/%s/accept: expected 200, got %d", orderResp.ID, res.StatusCode)
 		}
 	}
 
-	// Fetch listing after accepting order
 	{
-		req, _ := http.NewRequest("GET", baseURL+"/listings/"+lr.ID, nil)
-		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		// After accept
+		req, _ := http.NewRequest("GET", baseURL+"/listings/"+listingCreateResp.ID, nil)
+		req.Header.Set("Authorization", sellerAuth)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil || res.StatusCode != http.StatusOK {
-			t.Fatalf("GET /listings/%s after accept: %v / %d", lr.ID, err, res.StatusCode)
+			t.Fatalf("GET /listings/%s after accept: %v / %d", listingCreateResp.ID, err, res.StatusCode)
 		}
 		mustDecode(t, res, &after)
 		if after.LeftSize != before.LeftSize-1 {
@@ -492,35 +516,35 @@ func TestOrders(t *testing.T) {
 		}
 	}
 
-	// Check order status after accept
+	// 8. Check order status after accept
 	{
-		req, _ := http.NewRequest("GET", baseURL+"/orders/"+or.ID, nil)
-		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		req, _ := http.NewRequest("GET", baseURL+"/orders/"+orderResp.ID, nil)
+		req.Header.Set("Authorization", "Bearer "+userLogin.Token)
 		res, _ := http.DefaultClient.Do(req)
-		mustDecode(t, res, &or)
-		if or.Status != "accepted" {
-			t.Fatalf("order status after accept=%q; want accepted", or.Status)
+		mustDecode(t, res, &orderResp)
+		if orderResp.Status != "accepted" {
+			t.Fatalf("order status after accept=%q; want accepted", orderResp.Status)
 		}
 	}
 
-	// Complete Order
+	// 9. Complete Order
 	{
-		req, _ := http.NewRequest("PATCH", baseURL+"/orders/"+or.ID+"/complete", nil)
-		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		req, _ := http.NewRequest("PATCH", baseURL+"/orders/"+orderResp.ID+"/complete", nil)
+		req.Header.Set("Authorization", "Bearer "+userLogin.Token)
 		res, _ := http.DefaultClient.Do(req)
 		if res.StatusCode != http.StatusOK {
-			t.Fatalf("PATCH /orders/%s/complete: expected 200, got %d", or.ID, res.StatusCode)
+			t.Fatalf("PATCH /orders/%s/complete: expected 200, got %d", orderResp.ID, res.StatusCode)
 		}
 	}
 
-	// Final GET to confirm completion
+	// 10. Final GET to confirm completion
 	{
-		req, _ := http.NewRequest("GET", baseURL+"/orders/"+or.ID, nil)
-		req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+		req, _ := http.NewRequest("GET", baseURL+"/orders/"+orderResp.ID, nil)
+		req.Header.Set("Authorization", "Bearer "+userLogin.Token)
 		res, _ := http.DefaultClient.Do(req)
-		mustDecode(t, res, &or)
-		if or.Status != "completed" {
-			t.Fatalf("order status after complete=%q; want completed", or.Status)
+		mustDecode(t, res, &orderResp)
+		if orderResp.Status != "completed" {
+			t.Fatalf("order status after complete=%q; want completed", orderResp.Status)
 		}
 	}
 }
