@@ -1,73 +1,100 @@
+version: "3.8"
+
 services:
   db:
-    image: postgres:17.5-alpine3.22    # Alpine-based PostgreSQL
+    image: postgres:17.5-alpine3.22
     container_name: postgres
     restart: always
-    shm_size: 128mb              # shared memory limit
+    shm_size: 128mb
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: example
       POSTGRES_DB: mydatabase
     ports:
-      - "5432:5432"         # Expose PostgreSQL port  
-    healthcheck:      # Health check for PostgreSQL
+      - "5432:5432"
+    healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d mydatabase"]
       interval: 30s
       timeout: 10s
-      retries: 5  
-    logging:  # Logging configuration
+      retries: 5
+    logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    networks: 
-      - backend # Define a network for the database
+    networks:
+      - backend
     volumes:
       - pgdata:/var/lib/postgresql/data
-  
-  backend:  
-    build: .                       # Build from Dockerfile in current directory   
-    container_name: backend
-    restart: always 
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy  # Wait for db to be healthy
-    ports:
-      - "8000:8000"               # Expose backend port
-    environment:
-      DATABASE_URL: postgres://admin:example@db:5432/mydatabase
-    networks:
-      - backend                   # Connect to the backend network
-    logging:  # Logging configuration
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   redis:
-    image: redis:8.0.3-alpine          # Alpine-based Redis
+    image: redis:8.0.3-alpine
     container_name: redis
     restart: always
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
-    networks: 
-      - backend                     # Connect to the backend network      
-    healthcheck:      # Health check for Redis
+    networks:
+      - backend
+    healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
       retries: 5
-    logging:  # Logging configuration
+    logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # Define a network for the backend services
+  minio:
+    image: minio/minio
+    container_name: minio
+    command: server /data
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # MinIO web UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://admin:example@db:5432/mydatabase
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      MINIO_BUCKET: listing-images
+    networks:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   backend:
     driver: bridge
@@ -75,3 +102,4 @@ networks:
 volumes:
   pgdata:
   redisdata:
+  minio_data:

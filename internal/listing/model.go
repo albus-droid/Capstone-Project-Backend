@@ -19,4 +19,5 @@ type Listing struct {
     LeftSize    int            `json:"leftSize" gorm:"not null;default:0"` // portions left
     UpdatedAt   time.Time      `json:"updatedAt" gorm:"autoUpdateTime"`
     DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"` // soft‑delete
+    Image       string         `json:"image,omitempty"` // for multiple images per listing
 }
