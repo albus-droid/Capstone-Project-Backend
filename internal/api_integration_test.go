@@ -393,6 +393,19 @@ func TestOrders(t *testing.T) {
 		}
 	}
 
+	type listingResp struct {
+		ID          string    `json:"id"`
+		SellerID    string    `json:"sellerId"`
+		Title       string    `json:"title"`
+		Description string    `json:"description"`
+		Price       float64   `json:"price"`
+		Available   bool      `json:"available"`
+		PortionSize int       `json:"portionSize"`
+		LeftSize    int       `json:"leftSize"`
+		CreatedAt   string    `json:"createdAt"`   // or time.Time if your API returns proper time
+		UpdatedAt   string    `json:"updatedAt"`
+	}
+
 	// Create a listing for order with leftSize=10, portionSize=1
 	var lr struct{ ID string `json:"id"` }
 	{
