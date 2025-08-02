@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"io"                // <--- ADD THIS
+    "mime/multipart"     // <--- ADD THIS
 	"os"
 	"testing"
 	"time"
@@ -288,6 +290,110 @@ func TestListings(t *testing.T) {
             t.Fatal("listing create: missing id")
         }
     }
+
+	// 4) POST /listings (same as yours, unchanged)
+	var createRespa struct{ Message, ID string }
+	{
+		payload := map[string]interface{}{
+			"sellerId":    sellerID,
+			"title":       "OrderItem",
+			"description": "Freshly made order item",
+			"price":       15.0,
+			"available":   true,
+			"portionSize": 1,
+			"leftSize":    10,
+		}
+		b, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("POST", baseURL+"/listings", bytes.NewReader(b))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", authHeader)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("POST /listings: %v", err)
+		}
+		if res.StatusCode != http.StatusCreated {
+			t.Fatalf("POST /listings: expected 201, got %d", res.StatusCode)
+		}
+		mustDecode(t, res, &createRespa)
+		if createRespa.ID == "" {
+			t.Fatal("listing create: missing id")
+		}
+	}
+
+	// 5) POST /listings/:id/image (upload a sample image from internet)
+	var imageResp struct{ ImageURL string `json:"image_url"` }
+	{
+		// Download a sample image
+		imgRes, err := http.Get("https://www.cubesnjuliennes.com/wp-content/uploads/2020/07/Instant-Pot-Chicken-Curry.jpg")
+		if err != nil {
+			t.Fatalf("downloading test image: %v", err)
+		}
+		defer imgRes.Body.Close()
+
+		// Prepare multipart form
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		fw, err := mw.CreateFormFile("file", "testimage.jpg")
+		if err != nil {
+			t.Fatalf("create form file: %v", err)
+		}
+		if _, err := io.Copy(fw, imgRes.Body); err != nil {
+			t.Fatalf("copy image: %v", err)
+		}
+		mw.Close()
+
+		// Upload image
+		url := fmt.Sprintf("%s/listings/%s/image", baseURL, createResp.ID)
+		req, _ := http.NewRequest("POST", url, &buf)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", authHeader)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("POST /listings/:id/image: %v", err)
+		}
+		if res.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(res.Body)
+			t.Fatalf("POST /listings/:id/image: expected 200, got %d, body: %s", res.StatusCode, body)
+		}
+		mustDecode(t, res, &imageResp)
+		if imageResp.ImageURL == "" {
+			t.Fatal("image upload: missing image_url")
+		}
+	}
+
+	// 6) GET /listings/:id (verify image field present)
+	{
+		url := fmt.Sprintf("%s/listings/%s", baseURL, createResp.ID)
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("Authorization", authHeader)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("GET /listings/%s: %v", createResp.ID, err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /listings/%s: expected 200, got %d", createResp.ID, res.StatusCode)
+		}
+		var getResp struct {
+			Image string `json:"image"`
+		}
+		mustDecode(t, res, &getResp)
+		if getResp.Image == "" {
+			t.Fatal("listing image field missing after upload")
+		}
+	}
+
+	// 7) GET /listings (all) -- unchanged
+	{
+		req, _ := http.NewRequest("GET", baseURL+"/listings", nil)
+		req.Header.Set("Authorization", authHeader)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("GET /listings: %v", err)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET /listings: expected 200, got %d", res.StatusCode)
+		}
+	}
 
     // 5) GET /listings/:id
     {
